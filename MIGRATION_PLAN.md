@@ -3,13 +3,12 @@
 Repository: randomtconsultores/C-Space-2Web. Branch: migration/wasm.
 Baseline: 8490a9796f1bd2397e9f776f7c438f3a33e92dc0.
 
-1. First increment: browser host, Emscripten build and bounded C ASCII framebuffer displaying the original level generator.
-2. Next: integrate original gameplay, fixed timestep, keyboard and nonblocking UI states.
-3. Then: adapt existing saves/ranking and validate IDBFS persistence.
-4. Validate browser interactions through the user; record actual results before merging.
+1. Map preview: build passed in Codespace with Emscripten 6.0.13; browser rendering unconfirmed.
+2. Current increment: original input/update/draw/boss modules, C browser loop and keyboard bridge; awaiting Codespace compilation and manual playtest.
+3. Pending: original menus/remapping/animations, Q/N shortcuts, audio decision, saves/ranking and IDBFS.
+4. Validate after each increment through the user; merge only with recorded evidence.
 
-Keep the native Makefile and MAX_NIVEIS=4 unchanged. Do not add levels.
-The fourth configuration is zero-initialized and boss rules cover only indices 0-2; this inherited issue is outside migration scope.
-JavaScript presents C data; it does not implement game rules.
-Use a pre element for the initial ASCII presentation. No framework or bundler.
-The current browser entry is a static map preview, not the gameplay loop.
+Keep MAX_NIVEIS=4 and the native Makefile unchanged. No new levels.
+Web-only terminal adapter retains existing drawing/input interfaces. Original main.c and menu.c are not linked into the Web build.
+Fixed simulation intervals: 30/27/24 ms for configured levels, at most five catch-up updates; discard gaps over 250 ms. Rendering follows requestAnimationFrame.
+Missing level configuration produces an explicit error screen, never an early victory. Complete migration remains pending.
