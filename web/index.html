@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Space Game C — WebAssembly</title>
+  <style>
+    body { margin: 1.5rem; background: #101410; color: #9aff9a; font-family: monospace; }
+    #screen { display: block; overflow-x: auto; white-space: pre; font: 18px/1.2 monospace; }
+    #status { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Space Game C</h1>
+  <p>Primeiro incremento: mapa original em C/Wasm. Ainda sem controlos ou jogabilidade.</p>
+  <p id="status" role="status">A carregar WebAssembly…</p>
+  <pre id="screen" aria-label="Mapa ASCII do primeiro nível"></pre>
+  <script src="browser.js"></script>
+  <script async src="space.js" onerror="spaceLoadError()"></script>
+</body>
+</html>

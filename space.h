@@ -1,7 +1,9 @@
 #ifndef SPACE_H
 #define SPACE_H
 
+#ifndef SPACE_WEB
 #include <ncurses.h>
+#endif
 
 #define DELAY 30000
 #define LARGURA_TELA 40
