@@ -12,7 +12,7 @@ check-toolchain:
 	@command -v $(EMCC) >/dev/null 2>&1 || { echo "emcc not found; activate Emscripten before building."; exit 1; }
 $(OUT)/space.js $(OUT)/space.wasm &: $(SOURCES) $(HEADERS) web/Makefile
 	mkdir -p $(OUT)
-	$(EMCC) -std=gnu11 -Wall -Wextra -O0 -g -DSPACE_WEB -I. -include web/platform.h $(SOURCES) -lm -sASSERTIONS=1 -sENVIRONMENT=web -sFILESYSTEM=0 -sEXPORTED_FUNCTIONS='["_main","_web_buffer","_web_buffer_size","_web_width","_web_height","_web_input","_web_reset"]' -o $(OUT)/space.js
+	$(EMCC) -std=gnu11 -Wall -Wextra -O0 -g -DSPACE_WEB -I. -include web/platform.h $(SOURCES) -lm -sASSERTIONS=1 -sENVIRONMENT=web -sFILESYSTEM=0 -sEXPORTED_RUNTIME_METHODS='["HEAPU8"]' -sEXPORTED_FUNCTIONS='["_main","_web_buffer","_web_buffer_size","_web_width","_web_height","_web_input","_web_reset"]' -o $(OUT)/space.js
 $(OUT)/index.html: web/index.html
 	mkdir -p $(OUT)
 	cp $< $@
