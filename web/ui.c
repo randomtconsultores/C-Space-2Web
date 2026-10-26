@@ -1,16 +1,37 @@
 #include "ui.h"
 #include "menu.h"
 #include "terminal.h"
-enum MenuPage { MAIN_PAGE, CONTROLS_PAGE, CREDITS_PAGE, NOTICE_PAGE };
+#include "controls.h"
+enum MenuPage { MAIN_PAGE, CONTROLS_PAGE, CAPTURE_PAGE, CREDITS_PAGE, NOTICE_PAGE };
 static enum MenuPage page;
-static int selection;
+static int selection, control_selection;
+static const char *control_labels[5] = {
+    "MOVE UP", "MOVE DOWN", "MOVE LEFT", "MOVE RIGHT", "FIRE"
+};
 void web_menu_open(void)
 {
     page = MAIN_PAGE;
     selection = OPCAO_PLAY;
+    control_selection = 0;
+    web_capture_key(27);
 }
 enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
 {
+    if (page == CAPTURE_PAGE) {
+        if (!web_capture_active()) page = CONTROLS_PAGE;
+        return WEB_MENU_NONE;
+    }
+    if (page == CONTROLS_PAGE) {
+        if (back) { page = MAIN_PAGE; return WEB_MENU_NONE; }
+        if (up && control_selection > 0) --control_selection;
+        if (down && control_selection < 5) ++control_selection;
+        if (enter && control_selection > 0) {
+            web_capture_begin(control_selection - 1);
+            web_reset();
+            page = CAPTURE_PAGE;
+        }
+        return WEB_MENU_NONE;
+    }
     if (page != MAIN_PAGE) {
         if (enter || back) page = MAIN_PAGE;
         return WEB_MENU_NONE;
@@ -21,7 +42,7 @@ enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
     switch (selection) {
     case OPCAO_PLAY: return WEB_MENU_PLAY;
     case OPCAO_SAIR: return WEB_MENU_EXIT;
-    case OPCAO_COMANDOS: page = CONTROLS_PAGE; break;
+    case OPCAO_COMANDOS: page = CONTROLS_PAGE; control_selection = 0; break;
     case OPCAO_CREDITOS: page = CREDITS_PAGE; break;
     default: page = NOTICE_PAGE; break;
     }
@@ -46,12 +67,25 @@ void web_menu_render(void)
         mvprintw(cy + 2, 3, "ENTER / Q: return to menu");
     } else if (page == CONTROLS_PAGE) {
         mvprintw(2, 7, "SETTINGS & CONTROLS");
-        mvprintw(4, 3, "W / S: move up / down");
-        mvprintw(5, 3, "A / D: move left / right (stage 2+)");
-        mvprintw(6, 3, "SPACE: fire once per press");
-        mvprintw(8, 3, "Sound: OFF (not migrated yet)");
-        mvprintw(9, 3, "Key remapping: pending migration");
-        mvprintw(12, 3, "ENTER / Q: return to menu");
+        mvprintw(4, 3, "%s SOUND: OFF (not migrated)", control_selection == 0 ? "->" : "  ");
+        for (int i = 0; i < 5; ++i) {
+            int key = web_control_key(i);
+            const char *mark = control_selection == i + 1 ? "->" : "  ";
+            if (key == ' ')
+                mvprintw(5 + i, 3, "%s %s: [SPACE]", mark, control_labels[i]);
+            else
+                mvprintw(5 + i, 3, "%s %s: [%c]", mark, control_labels[i], key);
+        }
+        mvprintw(11, 2, "ENTER: modify key   Q: main menu");
+        mvprintw(13, 2, "Bindings last until page reload.");
+    } else if (page == CAPTURE_PAGE) {
+        mvprintw(4, 3, "NEW KEY FOR %s", control_labels[control_selection - 1]);
+        mvprintw(6, 3, "Press a printable ASCII key.");
+        mvprintw(8, 3, "ESC: cancel   Q/N: reserved");
+        int error = web_capture_error();
+        if (error == -1) mvprintw(11, 2, "Only ASCII 32..126 is supported.");
+        if (error == -2) mvprintw(11, 2, "Q/N conflict with native shortcuts.");
+        if (error == -3) mvprintw(11, 2, "That key is already assigned.");
     } else {
         mvprintw(4, 4, "%s", selection == OPCAO_LOAD ? "LOAD GAME" : "HIGH SCORES");
         mvprintw(6, 2, "Persistence not migrated yet.");

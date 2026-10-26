@@ -27,8 +27,9 @@ int main(void)
     assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_PLAY);
     web_menu_open(); select_down(2); web_menu_update(0, 0, 1, 0);
     web_menu_render();
-    assert(strstr((const char *)web_buffer(), "Key remapping: pending migration"));
+    assert(strstr((const char *)web_buffer(), "MOVE UP: [w]"));
     assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_NONE);
+    web_menu_update(0, 0, 0, 1);
     web_menu_render(); assert(strstr((const char *)web_buffer(), "SPACE GAME C"));
     web_menu_open(); select_down(3); web_menu_update(0, 0, 1, 0);
     web_menu_render(); assert(strstr((const char *)web_buffer(), "Developed in IEFP Course"));

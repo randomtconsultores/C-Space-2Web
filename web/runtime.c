@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "controls.h"
 #include <math.h>
 #include <string.h>
 static unsigned char held[9];
@@ -49,14 +50,13 @@ int web_enter_pressed(void)
 }
 void web_begin_tick(void)
 {
-    static const int movement[4] = {'w', 's', 'a', 'd'};
     count = cursor = 0;
-    if (fire_pending) keys[count++] = ' ';
+    if (fire_pending) keys[count++] = web_control_key(4);
     fire_pending = 0;
     int selected = -1;
     for (int i = 0; i < 4; ++i)
         if (held[i] && (selected < 0 || sequence[i] > sequence[selected])) selected = i;
-    if (selected >= 0) keys[count++] = movement[selected];
+    if (selected >= 0) keys[count++] = web_control_key(selected);
 }
 int web_getch(void) { return cursor < count ? keys[cursor++] : -1; }
 int web_steps(double now_ms, double step_ms)
