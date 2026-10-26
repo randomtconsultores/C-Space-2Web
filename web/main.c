@@ -5,11 +5,12 @@
 #include "runtime.h"
 #include "ui.h"
 #include "intro.h"
+#include "transition.h"
 #include <emscripten.h>
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, GAME_OVER, VICTORY, INVALID_LEVEL };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL };
 static enum Phase phase;
 static char mapa[ALTURA_TELA][LARGURA_MAPA];
 static Projétil enemy_shots[MAX_TIROS_INIMIGO];
@@ -49,6 +50,13 @@ static void begin_level(void)
     gerar_mapa_dinamico(mapa, seeds[level], level);
     web_reset();
     phase = PLAYING;
+}
+static void advance_level(void)
+{
+    if (++level >= MAX_NIVEIS) {
+        phase = VICTORY;
+        web_reset();
+    } else begin_level();
 }
 static void show_menu(void)
 {
@@ -138,7 +146,7 @@ static void tick(void)
 }
 static void render(void)
 {
-    if (phase == INTRO) return; /* Intro updates its own persistent framebuffer. */
+    if (phase == INTRO || phase == TRANSITION) return; /* Timed sequences own the framebuffer. */
     if (phase == MENU) { web_menu_render(); return; }
     if (phase == CLOSED) {
         web_clear();
@@ -159,7 +167,6 @@ static void render(void)
         return;
     }
     draw_game(&player, mapa, offset, level, &boss, enemy_shots);
-    if (phase == STAGE_CLEAR) mvprintw(7, 2, "STAGE CLEAR - ENTER: NEXT");
     if (phase == GAME_OVER) {
         mvprintw(6, 4, "YOU WERE CRUSHED!");
         mvprintw(7, 4, "FINAL SCORE: %ld", player.pontuacao);
@@ -182,15 +189,21 @@ static void frame(void)
         else if (action == WEB_MENU_EXIT) { phase = CLOSED; web_reset(); }
     } else if (phase == INTRO) {
         if (web_intro_update(now)) new_game();
-    } else if (enter && phase != PLAYING) {
-        if (phase == STAGE_CLEAR) {
-            if (++level >= MAX_NIVEIS) phase = VICTORY;
-            else begin_level();
-        } else show_menu();
+    } else if (phase == TRANSITION) {
+        if (web_transition_update(now)) advance_level();
+    } else if (enter && phase != PLAYING && phase != STAGE_CLEAR) {
+        show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;
     int updates = web_steps(now, step);
     for (int i = 0; i < updates && phase == PLAYING; ++i) tick();
+    if (phase == STAGE_CLEAR) {
+        web_reset();
+        if (level < MAX_NIVEIS - 1) {
+            web_transition_begin(level, now);
+            phase = TRANSITION;
+        } else advance_level();
+    }
     render();
     present();
 }

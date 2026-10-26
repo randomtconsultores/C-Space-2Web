@@ -1,43 +1,35 @@
-# Migration report — binary intro candidate
+# Migration report — timed transition candidate
 
-Repository: randomtconsultores/C-Space-2Web. Branch: migration/wasm.
-Last browser-validated baseline: e6cfff1ab0768dde831ab13ee999c7db20cba820.
-Codespace results below were supplied by the user; this assistant did not operate that browser.
+Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
+Last user-validated browser baseline: e6cfff1ab0768dde831ab13ee999c7db20cba820.
+Intro 8eb2506 is published but has no Codespace/browser validation result in this conversation.
 
-## This increment
-Created web/intro.h, web/intro.c and web/test_intro.c. Updated Web entry/build and migration documents.
-PLAY enters a timed INTRO state before new_game. It reuses the original draw.c column/title algorithm: 80 frames, 40 ms each, title after frame 35. Gameplay does not run during INTRO. new_game resets C input and seeds/generates the map only after completion.
-There is no new skip control. Native draw.c and other original gameplay modules, native Makefile and MAX_NIVEIS=4 are unchanged.
+## Changes
+Added web/transition.h, web/transition.c and web/test_transition.c. Updated web/main.c, web/Makefile and migration documents.
+Boss defeat now starts the original visual sequence automatically; completion advances exactly once without Enter. The final original level skips it. No gameplay updates during TRANSITION; begin_level clears input and preserves lives/score. The gameplay tick body is unchanged.
+Native sources, native Makefile and MAX_NIVEIS=4 are unchanged. No persistence, audio or new level added.
 
 ## Tested and passed
-- User PC: original native gameplay before repository creation.
-- Codespace agent: native baseline make -B exit 0, with 26 system return-value warnings and one fread return-value warning.
-- Codespace agent/user: Wasm builds and C/JS tests through e6cfff1 passed; private port 8000 returned HTTP 200. Emscripten 6.0.13; SDK Node v24.19.0.
-- User: initial gameplay, menu navigation, control capture/cancel and Escape/Q correction confirmed in the browser. Browser/version not recorded. This is not a full test of all configured levels or collision cases.
-- Current candidate, assistant environment: isolated C intro tests passed with Wall/Wextra/Werror, also under ASan/UBSan. Covered 3200 ms nominal completion, final-frame hold, title timing, restart, invalid/backward/suspended timestamps and bounded catch-up. Supporting headers/framebuffer/terminal were locally transcribed fixtures, not a complete checkout build.
+- User PC: original native game.
+- Codespace agent: native baseline make -B exit 0, 26 system return-value warnings and one fread warning.
+- Agent/user through e6cfff1: C/JS tests and Wasm builds passed; private port 8000 returned HTTP 200; initial gameplay, menu/control capture, Escape and Q confirmed. Toolchain: Emscripten 6.0.13, SDK Node v24.19.0. Browser/version not recorded.
+- Current transition units executed in assistant environment: C11 with Wall/Wextra/Werror; ASan/UBSan passed. Covered phase contents, nominal 7600/4600 ms durations, final blank hold, restart, invalid/backward/suspended timestamps, one-step catch-up bound, clipping and unchanged rand sequence. Isolated unit run with locally transcribed support fixtures, not a full checkout build.
 
-## Earlier tested failures and corrections
-- HEAPU8 was not exported: fixed at 183017f; user subsequently confirmed rendering.
-- PATH node could not execute: tests passed using NODE="$EMSDK_NODE", without global permission changes.
-- Numpad Enter was unmapped: fixed at a510b1e and confirmed by the user.
-- Q had been used for submenu return: e6cfff1 restores Q damage and uses Escape for submenus, confirmed by the user.
+## Prior failures addressed
+HEAPU8 export fixed at 183017f; PATH Node execution worked around with NODE="$EMSDK_NODE"; numpad Enter fixed at a510b1e; Escape/Q separation fixed at e6cfff1. User confirmed the relevant browser corrections.
 
 ## Inspection only / not tested
-- Inspection only: INTRO routing and unchanged gameplay update body in the Web entry; no simulation ticks while INTRO is active.
-- Not tested for this candidate: full Wasm build, actual browser animation, input isolation at transition or play after intro. No Emscripten in the assistant environment.
-- Still pending: level-transition animations, audio, full progression/collision and console/network audit, final native rebuild, and persistence/reload/error testing.
+Inspection: main-loop handoff, unchanged gameplay tick, input reset and preservation of player statistics.
+Not tested for this candidate: complete Wasm build, real boss-to-transition progression, browser rendering/input/console, or native rebuild. No emcc in assistant environment. No new claim of intro validation.
 
-## Commands (repository root)
+## Reproduction in Codespace (repository root)
 ```
 source "$HOME/emsdk/emsdk_env.sh"
 make -f web/Makefile test test-js NODE="$EMSDK_NODE"
 make -f web/Makefile
 make -f web/Makefile serve
 ```
-Use the existing SDK/server; do not open a second listener if port 8000 is already serving web/build. Keep forwarding private. Open through HTTP, not file://.
-Browser acceptance: PLAY shows the binary intro/title for about 3.2 active seconds, then starts normally; Enter/fire/Q during the intro must not skip it or leak into the new game. Check repeated PLAY and returning after a suspended tab.
+Reuse the existing private port 8000 server if active. Browser check: defeat a boss; observe explosion/pause, first-level upgrade and stage-complete flashes; next level starts without Enter and retains lives/score. Input during the sequence must not skip it or leak into resumed play. Check suspension and console errors. Also validate the earlier intro.
 
-## Remaining limits and decisions
-Persistence is deferred until the end of migration by user decision. LOAD GAME/HIGH SCORES remain notices; SQLite is under consideration, not implemented. No logins, new assets or per-level history added.
-Audio remains disabled; remappings are session-only. Stage transitions currently require Enter. The missing fourth-level configuration/AI is inherited and is reported without declaring victory.
-Migration remains incomplete. This intro has NOT yet been validated in the Codespace browser.
+## Remaining limits
+Persistence is deferred until the end; LOAD/ranking still pending. Audio disabled, bindings session-only, N debug shortcut pending. Original A/D upgrade text retained even when controls are remapped. Fourth-level configuration/AI remains incomplete and is not treated as victory. Full level/collision/console audit and final native regression remain pending. Migration is not complete.

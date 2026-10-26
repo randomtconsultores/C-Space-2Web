@@ -4,8 +4,8 @@ CC ?= cc
 NODE ?= node
 PYTHON ?= python3
 OUT := web/build
-SOURCES := web/main.c web/framebuffer.c web/runtime.c web/terminal.c web/ui.c web/controls.c web/intro.c space.c levels.c boss.c draw.c
-HEADERS := menu.h web/ui.h web/controls.h web/intro.h space.h levels.h boss.h draw.h web/framebuffer.h web/runtime.h web/terminal.h web/platform.h
+SOURCES := web/main.c web/framebuffer.c web/runtime.c web/terminal.c web/ui.c web/controls.c web/intro.c web/transition.c space.c levels.c boss.c draw.c
+HEADERS := menu.h web/ui.h web/controls.h web/intro.h web/transition.h space.h levels.h boss.h draw.h web/framebuffer.h web/runtime.h web/terminal.h web/platform.h
 TEST_COMMON := web/framebuffer.c web/runtime.c web/terminal.c web/controls.c web/test_game_globals.c
 .PHONY: all check-toolchain test test-js serve
 all: check-toolchain $(OUT)/space.js $(OUT)/space.wasm $(OUT)/index.html $(OUT)/browser.js
@@ -26,7 +26,8 @@ test:
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb $(TEST_COMMON) web/test_runtime.c -lm -o "$$tmp/runtime" && "$$tmp/runtime" && \
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb $(TEST_COMMON) web/ui.c web/test_ui.c -lm -o "$$tmp/ui" && "$$tmp/ui" && \
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb $(TEST_COMMON) web/ui.c web/test_controls.c -lm -o "$$tmp/controls" && "$$tmp/controls" && \
-	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb $(TEST_COMMON) web/intro.c web/test_intro.c -lm -o "$$tmp/intro" && "$$tmp/intro"
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb $(TEST_COMMON) web/intro.c web/test_intro.c -lm -o "$$tmp/intro" && "$$tmp/intro" && \
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb web/framebuffer.c web/terminal.c web/transition.c web/test_transition.c -lm -o "$$tmp/transition" && "$$tmp/transition"
 test-js:
 	$(NODE) --check web/browser.js
 	$(NODE) web/test_browser.js
