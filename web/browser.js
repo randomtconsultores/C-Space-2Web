@@ -29,9 +29,9 @@ var Module = {
                 Module.spaceRender = null;
             }
         };
-        var special = {Enter: 5, NumpadEnter: 5, ArrowUp: 7, ArrowDown: 8};
+        var special = {Enter: 5, NumpadEnter: 5, Escape: 6, ArrowUp: 7, ArrowDown: 8};
         var pressed = new Map();
-        var heldCounts = new Uint8Array(9);
+        var heldCounts = new Uint8Array(10);
         function reset() { pressed.clear(); heldCounts.fill(0); Module._web_reset(); }
         function character(event) {
             var key = -1;
@@ -46,7 +46,7 @@ var Module = {
             if (Object.prototype.hasOwnProperty.call(special, event.code))
                 return [special[event.code]];
             var key = character(event), result = [];
-            if (key === 113) result.push(6);
+            if (key === 113) result.push(9);
             /* Keep original W/S menu navigation independent of game bindings. */
             if (key === 119) result.push(7);
             if (key === 115) result.push(8);
@@ -83,6 +83,6 @@ var Module = {
         document.addEventListener("visibilitychange", function () {
             if (document.hidden) reset();
         });
-        statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Q volta. CONTROLS: remapear movimento/disparo; Escape cancela. Sem áudio ou gravação.";
+        statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Esc recua/cancela. Jogo: Q pede perda de vida (respeita imunidade). Sem áudio ou gravação.";
     }
 };

@@ -6,7 +6,7 @@
 int main(void)
 {
     web_reset();
-    web_input(-1, 1); web_input(9, 1);
+    web_input(-1, 1); web_input(10, 1);
     web_input(0, 1); web_input(4, 1); web_input(4, 1);
     web_begin_tick();
     assert(web_getch() == ' ' && web_getch() == 'w' && web_getch() == -1);
@@ -16,7 +16,21 @@ int main(void)
     web_input(4, 0); web_input(4, 1); web_begin_tick();
     assert(web_getch() == ' ' && web_getch() == 'w' && web_getch() == -1);
     web_input(5, 1); assert(web_enter_pressed() == 1 && web_enter_pressed() == 0);
-    web_reset(); web_begin_tick(); assert(web_getch() == -1);
+    web_reset();
+    web_input(0, 1); web_input(4, 1); web_input(9, 1);
+    web_begin_tick(); assert(web_getch() == 'q' && web_getch() == -1);
+    web_begin_tick(); assert(web_getch() == 'q' && web_getch() == -1);
+    web_input(9, 0); web_begin_tick();
+    assert(web_getch() == 'w' && web_getch() == -1);
+    web_input(9, 1); web_input(9, 0);
+    web_begin_tick(); assert(web_getch() == 'q' && web_getch() == -1);
+    assert(web_take_press(6) == 0);
+    web_reset(); web_input(6, 1); web_input(6, 0);
+    assert(web_take_press(6) == 1 && web_take_press(6) == 0);
+    web_begin_tick(); assert(web_getch() == -1);
+    web_input(9, 1); web_reset();
+    web_begin_tick(); assert(web_getch() == -1);
+    assert(web_take_press(10) == 0);
     assert(web_steps(0, 30) == 0 && web_steps(16, 30) == 0);
     assert(web_steps(32, 30) == 1 && web_steps(90, 30) == 2);
     assert(web_steps(330, 30) == 5 && web_steps(360, 30) == 1);
@@ -39,6 +53,6 @@ int main(void)
     assert(web_buffer()[2 * WEB_STRIDE + 2] == '#');
     assert(web_buffer()[2 * WEB_STRIDE + 3] == '>');
     assert(mvprintw(-1, 0, "x") == ERR);
-    puts("PASS: input edges/held/reset, bounded fixed timestep and terminal formatting");
+    puts("PASS: Q tap/hold/reset, Escape separation, input, fixed timestep and formatting");
     return 0;
 }

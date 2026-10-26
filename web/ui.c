@@ -64,7 +64,7 @@ void web_menu_render(void)
     } else if (page == CREDITS_PAGE) {
         mvprintw(cy - 1, cx - 12, "Developed in IEFP Course");
         mvprintw(cy, cx - 6, "Final Lab C");
-        mvprintw(cy + 2, 3, "ENTER / Q: return to menu");
+        mvprintw(cy + 2, 3, "ENTER / ESC: return to menu");
     } else if (page == CONTROLS_PAGE) {
         mvprintw(2, 7, "SETTINGS & CONTROLS");
         mvprintw(4, 3, "%s SOUND: OFF (not migrated)", control_selection == 0 ? "->" : "  ");
@@ -76,7 +76,7 @@ void web_menu_render(void)
             else
                 mvprintw(5 + i, 3, "%s %s: [%c]", mark, control_labels[i], key);
         }
-        mvprintw(11, 2, "ENTER: modify key   Q: main menu");
+        mvprintw(11, 2, "ENTER: modify key  ESC: main menu");
         mvprintw(13, 2, "Bindings last until page reload.");
     } else if (page == CAPTURE_PAGE) {
         mvprintw(4, 3, "NEW KEY FOR %s", control_labels[control_selection - 1]);
@@ -90,6 +90,6 @@ void web_menu_render(void)
         mvprintw(4, 4, "%s", selection == OPCAO_LOAD ? "LOAD GAME" : "HIGH SCORES");
         mvprintw(6, 2, "Persistence not migrated yet.");
         mvprintw(8, 2, "No save or ranking data is read.");
-        mvprintw(11, 3, "ENTER / Q: return to menu");
+        mvprintw(11, 3, "ENTER / ESC: return to menu");
     }
 }
