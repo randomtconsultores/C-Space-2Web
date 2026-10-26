@@ -1,13 +1,15 @@
 #include "runtime.h"
 #include <math.h>
 #include <string.h>
-static unsigned char held[6];
+static unsigned char held[9];
 static unsigned long sequence[4], serial;
+static unsigned pressed;
 static int fire_pending, enter_pending, keys[2], count, cursor;
 static double last_ms, accumulated;
 static int clock_started;
 void web_flush_pressed(void)
 {
+    pressed = 0;
     fire_pending = enter_pending = count = cursor = 0;
 }
 void web_reset(void)
@@ -21,14 +23,23 @@ void web_reset(void)
 }
 void web_input(int key, int down)
 {
-    if (key < 0 || key >= 6) return;
+    if (key < 0 || key >= 9) return;
     down = !!down;
     if (down && !held[key]) {
+        pressed |= 1u << key;
         if (key < 4) sequence[key] = ++serial;
         if (key == 4) fire_pending = 1;
         if (key == 5) enter_pending = 1;
     }
     held[key] = (unsigned char)down;
+}
+int web_take_press(int key)
+{
+    if (key < 0 || key >= 9) return 0;
+    unsigned bit = 1u << key;
+    int result = !!(pressed & bit);
+    pressed &= ~bit;
+    return result;
 }
 int web_enter_pressed(void)
 {

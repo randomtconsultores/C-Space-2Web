@@ -1,0 +1,47 @@
+#include "ui.h"
+#include "runtime.h"
+#include "framebuffer.h"
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+static void select_down(int n)
+{
+    for (int i = 0; i < n; ++i)
+        assert(web_menu_update(0, 1, 0, 0) == WEB_MENU_NONE);
+}
+int main(void)
+{
+    web_menu_open();
+    web_menu_render();
+    assert(strstr((const char *)web_buffer(), "SPACE GAME C"));
+    web_menu_update(1, 0, 0, 0);
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_PLAY);
+    web_menu_open(); select_down(20);
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_EXIT);
+    web_menu_open(); select_down(1);
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_NONE);
+    web_menu_render();
+    assert(strstr((const char *)web_buffer(), "Persistence not migrated yet."));
+    assert(web_menu_update(0, 0, 0, 1) == WEB_MENU_NONE);
+    web_menu_update(1, 0, 0, 0);
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_PLAY);
+    web_menu_open(); select_down(2); web_menu_update(0, 0, 1, 0);
+    web_menu_render();
+    assert(strstr((const char *)web_buffer(), "Key remapping: pending migration"));
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_NONE);
+    web_menu_render(); assert(strstr((const char *)web_buffer(), "SPACE GAME C"));
+    web_menu_open(); select_down(3); web_menu_update(0, 0, 1, 0);
+    web_menu_render(); assert(strstr((const char *)web_buffer(), "Developed in IEFP Course"));
+    web_menu_open(); select_down(4); web_menu_update(0, 0, 1, 0);
+    web_menu_render(); assert(strstr((const char *)web_buffer(), "HIGH SCORES"));
+    web_reset();
+    web_input(7, 1); web_input(7, 1);
+    assert(web_take_press(7) == 1 && web_take_press(7) == 0);
+    web_begin_tick(); assert(web_getch() == -1);
+    web_input(6, 1); assert(web_take_press(6) == 1);
+    web_begin_tick(); assert(web_getch() == -1);
+    assert(web_take_press(-1) == 0 && web_take_press(9) == 0);
+    web_input(8, 1); web_reset(); assert(web_take_press(8) == 0);
+    puts("PASS: menu bounds, actions, pages, pending persistence and UI-only key edges");
+    return 0;
+}

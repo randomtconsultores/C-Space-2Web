@@ -4,8 +4,8 @@ CC ?= cc
 NODE ?= node
 PYTHON ?= python3
 OUT := web/build
-SOURCES := web/main.c web/framebuffer.c web/runtime.c web/terminal.c space.c levels.c boss.c draw.c
-HEADERS := space.h levels.h boss.h draw.h web/framebuffer.h web/runtime.h web/terminal.h web/platform.h
+SOURCES := web/main.c web/framebuffer.c web/runtime.c web/terminal.c web/ui.c space.c levels.c boss.c draw.c
+HEADERS := menu.h web/ui.h space.h levels.h boss.h draw.h web/framebuffer.h web/runtime.h web/terminal.h web/platform.h
 .PHONY: all check-toolchain test test-js serve
 all: check-toolchain $(OUT)/space.js $(OUT)/space.wasm $(OUT)/index.html $(OUT)/browser.js
 check-toolchain:
@@ -22,7 +22,8 @@ $(OUT)/browser.js: web/browser.js
 test:
 	@tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT HUP INT TERM; \
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -Iweb web/framebuffer.c web/test_framebuffer.c -o "$$tmp/framebuffer" && "$$tmp/framebuffer" && \
-	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -Iweb web/framebuffer.c web/runtime.c web/terminal.c web/test_runtime.c -lm -o "$$tmp/runtime" && "$$tmp/runtime"
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -Iweb web/framebuffer.c web/runtime.c web/terminal.c web/test_runtime.c -lm -o "$$tmp/runtime" && "$$tmp/runtime" && \
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -I. -Iweb web/framebuffer.c web/runtime.c web/terminal.c web/ui.c web/test_ui.c -lm -o "$$tmp/ui" && "$$tmp/ui"
 test-js:
 	$(NODE) --check web/browser.js
 	$(NODE) web/test_browser.js

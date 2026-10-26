@@ -6,7 +6,7 @@
 int main(void)
 {
     web_reset();
-    web_input(-1, 1); web_input(6, 1);
+    web_input(-1, 1); web_input(9, 1);
     web_input(0, 1); web_input(4, 1); web_input(4, 1);
     web_begin_tick();
     assert(web_getch() == ' ' && web_getch() == 'w' && web_getch() == -1);

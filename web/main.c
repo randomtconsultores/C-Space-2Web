@@ -3,11 +3,12 @@
 #include "draw.h"
 #include "framebuffer.h"
 #include "runtime.h"
+#include "ui.h"
 #include <emscripten.h>
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { READY, PLAYING, STAGE_CLEAR, GAME_OVER, VICTORY, INVALID_LEVEL };
+enum Phase { MENU, CLOSED, PLAYING, STAGE_CLEAR, GAME_OVER, VICTORY, INVALID_LEVEL };
 static enum Phase phase;
 static char mapa[ALTURA_TELA][LARGURA_MAPA];
 static Projétil enemy_shots[MAX_TIROS_INIMIGO];
@@ -48,13 +49,18 @@ static void begin_level(void)
     web_reset();
     phase = PLAYING;
 }
+static void show_menu(void)
+{
+    phase = MENU;
+    web_menu_open();
+    web_reset();
+}
 static void new_game(void)
 {
     memset(&player, 0, sizeof player);
     player.vidas = 3;
     level = 0;
     begin_level();
-    phase = READY;
 }
 /* Matches the original respawn; body collisions do not clear projectiles. */
 static void take_damage(int reset_projectiles)
@@ -131,36 +137,47 @@ static void tick(void)
 }
 static void render(void)
 {
+    if (phase == MENU) { web_menu_render(); return; }
+    if (phase == CLOSED) {
+        web_clear();
+        mvprintw(6, 4, "SESSION CLOSED");
+        mvprintw(8, 4, "ENTER: MAIN MENU");
+        return;
+    }
     if (phase == INVALID_LEVEL) {
         web_clear();
         mvprintw(5, 2, "LEVEL %d: CONFIGURATION MISSING", level + 1);
         mvprintw(7, 2, "Inherited issue; not a victory.");
-        mvprintw(9, 2, "ENTER: return to start");
+        mvprintw(9, 2, "ENTER: MAIN MENU");
         return;
     }
     if (phase == VICTORY) {
         web_clear();
-        mvprintw(7, 4, "TOTAL VICTORY! ENTER: RESTART");
+        mvprintw(7, 4, "TOTAL VICTORY! ENTER: MENU");
         return;
     }
     draw_game(&player, mapa, offset, level, &boss, enemy_shots);
-    if (phase == READY) mvprintw(7, 4, "ENTER: START");
     if (phase == STAGE_CLEAR) mvprintw(7, 2, "STAGE CLEAR - ENTER: NEXT");
     if (phase == GAME_OVER) {
         mvprintw(6, 4, "YOU WERE CRUSHED!");
         mvprintw(7, 4, "FINAL SCORE: %ld", player.pontuacao);
-        mvprintw(9, 4, "ENTER: PLAY AGAIN");
+        mvprintw(9, 4, "ENTER: MAIN MENU");
     }
 }
 static void frame(void)
 {
     int enter = web_enter_pressed();
-    if (enter && phase != PLAYING) {
-        if (phase == READY) { web_reset(); phase = PLAYING; }
-        else if (phase == STAGE_CLEAR) {
+    if (phase == MENU) {
+        int up = web_take_press(0) | web_take_press(7);
+        int down = web_take_press(1) | web_take_press(8);
+        enum WebMenuAction action = web_menu_update(up, down, enter, web_take_press(6));
+        if (action == WEB_MENU_PLAY) new_game();
+        else if (action == WEB_MENU_EXIT) { phase = CLOSED; web_reset(); }
+    } else if (enter && phase != PLAYING) {
+        if (phase == STAGE_CLEAR) {
             if (++level >= MAX_NIVEIS) phase = VICTORY;
             else begin_level();
-        } else new_game();
+        } else show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;
     int updates = web_steps(emscripten_get_now(), step);
@@ -172,7 +189,7 @@ int main(void)
 {
     som_ativo = 0;
     init_game();
-    new_game();
+    show_menu();
     emscripten_set_main_loop(frame, 0, 0);
     return 0;
 }
