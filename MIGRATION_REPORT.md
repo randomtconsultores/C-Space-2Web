@@ -1,35 +1,29 @@
-# Migration report — timed transition candidate
+# Migration report — bounded audio bridge candidate
 
 Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
-Last user-validated browser baseline: e6cfff1ab0768dde831ab13ee999c7db20cba820.
-Intro 8eb2506 is published but has no Codespace/browser validation result in this conversation.
+Browser-playtested baseline remains e6cfff1ab0768dde831ab13ee999c7db20cba820.
+Latest Codespace test/build baseline is a5a5f1b16019f855716a110104cde455f11f9486.
 
-## Changes
-Added web/transition.h, web/transition.c and web/test_transition.c. Updated web/main.c, web/Makefile and migration documents.
-Boss defeat now starts the original visual sequence automatically; completion advances exactly once without Enter. The final original level skips it. No gameplay updates during TRANSITION; begin_level clears input and preserves lives/score. The gameplay tick body is unchanged.
-Native sources, native Makefile and MAX_NIVEIS=4 are unchanged. No persistence, audio or new level added.
+## User-reported validation update
+User reports clean migration/wasm before pull, fast-forward to the exact a5a5f1b SHA, test and test-js passed, Wasm build passed, no errors. No server started. This validates repository tests/build including intro/transitions, not visual browser acceptance. The assistant did not operate Codespace or that browser.
 
-## Tested and passed
-- User PC: original native game.
-- Codespace agent: native baseline make -B exit 0, 26 system return-value warnings and one fread warning.
-- Agent/user through e6cfff1: C/JS tests and Wasm builds passed; private port 8000 returned HTTP 200; initial gameplay, menu/control capture, Escape and Q confirmed. Toolchain: Emscripten 6.0.13, SDK Node v24.19.0. Browser/version not recorded.
-- Current transition units executed in assistant environment: C11 with Wall/Wextra/Werror; ASan/UBSan passed. Covered phase contents, nominal 7600/4600 ms durations, final blank hold, restart, invalid/backward/suspended timestamps, one-step catch-up bound, clipping and unchanged rand sequence. Isolated unit run with locally transcribed support fixtures, not a full checkout build.
+## Current increment: audio boundary only
+Added web/audio.h, web/audio.c and web/test_audio.c; updated web/platform.h, web/Makefile and migration documents.
+The existing browser-only system macro now maps 16 exact SoX gameplay command literals from main.c, space.c and boss.c to stable numeric IDs. It never executes commands. Unknown/null input and queue overflow return -1; successful enqueue returns 0. Fixed FIFO capacity 16, drop-newest policy, explicit empty sentinel and clear operation. No allocation, blocking, shell, gameplay RNG or new gameplay rules.
+Only take/clear are exported to the future JS consumer; command-string input is not exported. Native sources/build, MAX_NIVEIS=4, Web main/gameplay, browser.js and controls remain unchanged. Audio remains disabled and inaudible. This is preparation, NOT completed audio support.
 
-## Prior failures addressed
-HEAPU8 export fixed at 183017f; PATH Node execution worked around with NODE="$EMSDK_NODE"; numpad Enter fixed at a510b1e; Escape/Q separation fixed at e6cfff1. User confirmed the relevant browser corrections.
+## Executed tests for this candidate
+Assistant environment: isolated C11 units passed with Wall/Wextra/Werror, also ASan/UBSan. Covered all 16 mappings, system macro interception, unknown/null rejection, FIFO ordering, overflow without overwriting old events, wraparound, 10000 enqueue/take cycles, clear/reuse and unchanged rand sequence. Supporting terminal/runtime/framebuffer headers were locally transcribed and Git-blob-hash matched against retrieved repository versions. No complete checkout or Emscripten build in this environment; emcc unavailable.
 
-## Inspection only / not tested
-Inspection: main-loop handoff, unchanged gameplay tick, input reset and preservation of player statistics.
-Not tested for this candidate: complete Wasm build, real boss-to-transition progression, browser rendering/input/console, or native rebuild. No emcc in assistant environment. No new claim of intro validation.
+## Earlier evidence retained
+Original native game tested on user PC. Codespace native baseline make -B passed with 26 system-result warnings and one fread-result warning. Emscripten 6.0.13 and SDK Node v24.19.0 supported prior Web builds. User confirmed initial gameplay/menu/remapping and Enter/Escape/Q fixes; browser/version unrecorded. HEAPU8 fixed at 183017f, numpad Enter at a510b1e, Escape/Q at e6cfff1; PATH Node issue worked around with NODE="$EMSDK_NODE".
 
-## Reproduction in Codespace (repository root)
+## Next validation and limits
+After publication, repeat test/test-js and Wasm build in Codespace. Existing commands:
 ```
 source "$HOME/emsdk/emsdk_env.sh"
 make -f web/Makefile test test-js NODE="$EMSDK_NODE"
 make -f web/Makefile
-make -f web/Makefile serve
 ```
-Reuse the existing private port 8000 server if active. Browser check: defeat a boss; observe explosion/pause, first-level upgrade and stage-complete flashes; next level starts without Enter and retains lives/score. Input during the sequence must not skip it or leak into resumed play. Check suspension and console errors. Also validate the earlier intro.
-
-## Remaining limits
-Persistence is deferred until the end; LOAD/ranking still pending. Audio disabled, bindings session-only, N debug shortcut pending. Original A/D upgrade text retained even when controls are remapped. Fourth-level configuration/AI remains incomplete and is not treated as victory. Full level/collision/console audit and final native regression remain pending. Migration is not complete.
+No new server is needed for this bridge-only check. Browser audio, SOUND toggle, activation, voice lifecycle and original main.c sound-site integration belong to the next increment. Ranking celebration/audio stays deferred with persistence. Do not invent a player-fire sound: process_input has no such native request.
+Visual intro/transitions, complete levels/collisions, console/network and final native regression remain pending. Persistence is last; LOAD/ranking are notices, bindings session-only, N debug pending. Fourth-level configuration/AI remains incomplete. Migration is not complete.

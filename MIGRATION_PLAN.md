@@ -3,24 +3,24 @@
 Repository: randomtconsultores/C-Space-2Web. Branch: migration/wasm.
 Native baseline: 8490a9796f1bd2397e9f776f7c438f3a33e92dc0.
 Last user-validated browser baseline: e6cfff1ab0768dde831ab13ee999c7db20cba820.
+Last Codespace C/JS-test and Wasm-build baseline: a5a5f1b16019f855716a110104cde455f11f9486.
 
-## Completed baseline
-Wasm build, HTTP serving, ASCII framebuffer, initial gameplay, nonblocking menu, control remapping, both Enter keys, Escape navigation and Q damage were checked through the user. This is not a full progression/collision audit.
+## Completed and pending acceptance
+- Wasm/HTTP/framebuffer, initial gameplay, menu, remapping, Enter variants, Escape and Q were checked through the user. Not a full gameplay audit.
+- Binary intro and timed stage transitions are implemented. User reports test/test-js and Wasm build passed for a5a5f1b, with no errors; no server was started in that check.
+- Visual intro/transitions, input isolation and complete progression still need browser acceptance.
 
-## Animation increments awaiting acceptance
-- Intro published at 8eb25067b7e86233ec1d909cf4752dd9764a0447: 80 timed frames; no Codespace/browser result supplied yet.
-- Current transition candidate: port draw_transition from draw.c to a timed C state; remove the temporary Enter-to-advance gate.
-- Preserve original sequence: four 150 ms explosion steps, 2000 ms blank pause, first-level upgrade flashes (3 x 800/200 ms), completion flashes (2 x 700/300 ms).
-- Nominal durations: 7600 ms after level 1; 4600 ms after other non-final levels. The original final level skips the transition.
-- One phase change per callback; every phase receives its full hold. Discard negative or over-250 ms deltas. No sleeps, threads, workers or new JS game rules.
-- Stop gameplay ticks during animations; advance once and clear input before resuming. Preserve lives/score; do not replay the intro between levels.
+## Current candidate: audio boundary, part 1 of 2
+- Preserve native gameplay files. Convert only 16 exact existing gameplay SoX command literals to stable scalar IDs in a Web-only adapter.
+- Fixed FIFO of 16 one-byte events; drop newest on overflow. Unknown/null commands are rejected; never run a shell. No allocation, sleeps or RNG calls.
+- Export take/clear for the next browser consumer; include isolated C tests in make test.
+- Sound remains disabled in web/main.c. This increment does NOT produce audible sound or implement SOUND controls.
 
 ## Remaining order
-1. Codespace build and browser validation of intro and transitions.
-2. Adapt existing audio.
-3. Audit bosses, collisions, configured level progression, suspension and console/network behavior.
-4. Persistence LAST: existing saves/ranking and reload/error tests. SQLite and future data/resource evolution remain design considerations, not new features now.
-5. Final regression, documentation and PR review before merge.
+1. Validate this bridge in Codespace, then implement audio part 2: browser reproduction of existing effects, SOUND toggle, input-gesture activation, bounded voices and clear/stop on mute or focus loss. Audit and wire the original main.c sound sites in the Web entry without changing gameplay rules. No new music or firing effect.
+2. Validate intro/transitions visually and audit bosses, collisions, configured progression, suspension and console/network behavior.
+3. Persistence LAST: original saves/ranking, ranking celebration/name capture, reload/error tests. Ranking sound is deferred with that feature. SQLite and future resource/data evolution remain design considerations.
+4. Final native/Web regression, documentation and PR review before merge.
 
 ## Constraints
-MAX_NIVEIS stays 4; no new levels, accounts or assets. Native gameplay modules/build remain unchanged. The incomplete fourth configuration produces an explicit error, not an early victory. LOAD GAME/HIGH SCORES remain notices. User operates Codespace/browser and controls merges; the agent runs short checks.
+MAX_NIVEIS remains 4; the incomplete fourth configuration is an explicit inherited error, not early victory. No new levels, accounts or assets. Native build/core remain unchanged. LOAD/ranking stay notices. User operates Codespace/browser and controls merges; agent runs short checks.
