@@ -37,6 +37,13 @@ events.keydown(key("Space", {ctrlKey: true}));
 assert.equal(calls.length, 2);
 events.keydown(key("Space"));
 assert.deepEqual(calls.at(-1), [4, 1]);
+for (const code of ["Enter", "NumpadEnter"]) {
+    const start = calls.length;
+    events.keydown(key(code));
+    events.keydown(key(code, {repeat: true}));
+    events.keyup(key(code));
+    assert.deepEqual(calls.slice(start), [[5, 1], [5, 0]], code);
+}
 events.blur(); assert.equal(resets, 1);
 context.document.hidden = true;
 docEvents.visibilitychange(); assert.equal(resets, 2);
@@ -47,4 +54,4 @@ M._web_buffer_size = () => 999;
 M.spaceRender(); assert.equal(errors.length, 1);
 assert.equal(M.spaceRender, null);
 assert.match(status.textContent, /Falha na apresentação/);
-console.log("PASS: browser input, focus reset, heap replacement and error handling (mock DOM)");
+console.log("PASS: browser input including both Enter keys, focus reset, heap replacement and error handling (mock DOM)");

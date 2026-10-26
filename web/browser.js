@@ -29,7 +29,7 @@ var Module = {
                 Module.spaceRender = null;
             }
         };
-        var keys = {KeyW: 0, KeyS: 1, KeyA: 2, KeyD: 3, Space: 4, Enter: 5};
+        var keys = {KeyW: 0, KeyS: 1, KeyA: 2, KeyD: 3, Space: 4, Enter: 5, NumpadEnter: 5};
         var pressed = new Set();
         function reset() { pressed.clear(); Module._web_reset(); }
         window.addEventListener("keydown", function (event) {
