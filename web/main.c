@@ -4,11 +4,12 @@
 #include "framebuffer.h"
 #include "runtime.h"
 #include "ui.h"
+#include "intro.h"
 #include <emscripten.h>
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, PLAYING, STAGE_CLEAR, GAME_OVER, VICTORY, INVALID_LEVEL };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, GAME_OVER, VICTORY, INVALID_LEVEL };
 static enum Phase phase;
 static char mapa[ALTURA_TELA][LARGURA_MAPA];
 static Projétil enemy_shots[MAX_TIROS_INIMIGO];
@@ -137,6 +138,7 @@ static void tick(void)
 }
 static void render(void)
 {
+    if (phase == INTRO) return; /* Intro updates its own persistent framebuffer. */
     if (phase == MENU) { web_menu_render(); return; }
     if (phase == CLOSED) {
         web_clear();
@@ -166,13 +168,20 @@ static void render(void)
 }
 static void frame(void)
 {
+    double now = emscripten_get_now();
     int enter = web_enter_pressed();
     if (phase == MENU) {
         int up = web_take_press(0) | web_take_press(7);
         int down = web_take_press(1) | web_take_press(8);
         enum WebMenuAction action = web_menu_update(up, down, enter, web_take_press(6));
-        if (action == WEB_MENU_PLAY) new_game();
+        if (action == WEB_MENU_PLAY) {
+            web_reset();
+            web_intro_begin(now);
+            phase = INTRO;
+        }
         else if (action == WEB_MENU_EXIT) { phase = CLOSED; web_reset(); }
+    } else if (phase == INTRO) {
+        if (web_intro_update(now)) new_game();
     } else if (enter && phase != PLAYING) {
         if (phase == STAGE_CLEAR) {
             if (++level >= MAX_NIVEIS) phase = VICTORY;
@@ -180,7 +189,7 @@ static void frame(void)
         } else show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;
-    int updates = web_steps(emscripten_get_now(), step);
+    int updates = web_steps(now, step);
     for (int i = 0; i < updates && phase == PLAYING; ++i) tick();
     render();
     present();

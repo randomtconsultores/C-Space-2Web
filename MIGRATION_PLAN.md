@@ -2,25 +2,33 @@
 
 Repository: randomtconsultores/C-Space-2Web. Branch: migration/wasm.
 Native baseline: 8490a9796f1bd2397e9f776f7c438f3a33e92dc0.
-Playable baseline validated by the user: a510b1e46a10c820d70db67b10c4a9c09b65ce27.
+Latest user-validated browser baseline: e6cfff1ab0768dde831ab13ee999c7db20cba820.
 
-## Completed increments
-- Browser host, bounded 40x15 C ASCII framebuffer and Emscripten build.
-- Original input/update/draw/boss modules connected through a Web-only terminal adapter.
-- Persistent C state, nonblocking main loop, fixed updates and independent rendering.
-- Keyboard press/release, focus reset and both Enter variants.
-- Codespace builds/tests and initial browser playtest confirmed through the user; see MIGRATION_REPORT.md for scope.
+## Implemented and checked through the user
+- Wasm build, HTTP serving, bounded C ASCII framebuffer and initial gameplay.
+- Original input/update/draw/boss modules behind the Web terminal adapter.
+- Nonblocking main menu, credits and control capture/remapping.
+- Both Enter variants, focus/input reset, Escape for submenus and Q through the original damage path.
+- These are scoped playtests, not a complete progression/collision audit.
 
-## Next increments
-1. Restore the original main menu using nonblocking C UI states. Preserve the current playable path.
-2. Restore controls/remapping, credits and remaining original UI/animations. Resolve Q/N shortcut behavior explicitly.
-3. Integrate existing saves/ranking, load validation and serialized IDBFS synchronization; test persistence after reload.
-4. Decide and document browser audio handling; currently disabled.
-5. Validate bosses, collisions, all configured level transitions, suspended-page timing and extended-session console behavior. Finish documentation and review before merge.
+## Current candidate: binary introduction
+- Port the original 80 frames at 40 ms each (nominal 3.2 seconds) into a timed C state.
+- No usleep, blocking loop, worker, DOM game logic or new gameplay feature.
+- Generate the level only after the intro, preserving the original order before map srand(seed).
+- Do not update gameplay during the intro; clear queued/held C input before play.
+- Preserve the last frame for its 40 ms; cap catch-up at five updates and discard gaps over 250 ms.
+- Local isolated intro units passed; Codespace Wasm build and browser acceptance remain pending.
 
-## Constraints and decisions
-- Keep MAX_NIVEIS=4 and the native Makefile unchanged. Do not add levels or unrelated features.
-- Original main.c/menu.c are preserved but not linked into the current Web build. JavaScript handles presentation/input, not game rules.
-- Fixed simulation intervals are 30/27/24 ms for configured levels, capped at five catch-up updates; gaps over 250 ms are discarded. Rendering follows requestAnimationFrame.
-- Existing fourth-level configuration/AI incompleteness remains outside migration scope. An explicit error is not an early victory or migration completion.
-- User operates Codespace/browser and controls merges. The agent runs short checks; this assistant prepares changes and maintains documentation.
+## Remaining order, agreed with the user
+1. Validate the intro candidate, then restore original level-transition animations without blocking.
+2. Decide and implement the adaptation of existing audio.
+3. Validate bosses, collisions, configured level progression, suspended-page timing and console/network behavior.
+4. Persistence LAST: original saves and ranking, including ranking celebration/name entry when connected to real data; verify reload and errors.
+5. Final regression checks, documentation and PR review before merge.
+
+## Constraints
+- Keep MAX_NIVEIS=4 and the native build. No new levels or unrelated features.
+- LOAD GAME and HIGH SCORES remain explicitly pending. No database or persistence added in this increment.
+- Consider SQLite and future data/resource evolution during storage design, but do not add accounts, images/sounds or per-level history now. Storage/backend decisions remain deferred.
+- The incomplete fourth level remains an inherited issue, not an early victory.
+- User operates Codespace/browser and controls merges; the agent runs short checks; this assistant prepares code and documentation.
