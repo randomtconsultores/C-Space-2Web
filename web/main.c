@@ -110,8 +110,15 @@ static void reward(void)
 }
 static void tick(void)
 {
-    web_begin_tick();
-    process_input(&player, mapa, offset, level >= 1);
+    if (web_skip_pressed()) {
+        /* Apply native N before map input can inspect a negative sentinel. */
+        player.x = 2;
+        offset = configuracao_niveis[level].comprimento_mapa - LARGURA_TELA;
+        web_flush_pressed();
+    } else {
+        web_begin_tick();
+        process_input(&player, mapa, offset, level >= 1);
+    }
     if (player.x == -99) {
         if (player.imunidade <= 0) take_damage(1);
         else player.x = 2;

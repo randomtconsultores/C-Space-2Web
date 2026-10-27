@@ -2,7 +2,7 @@
 #include "controls.h"
 #include <math.h>
 #include <string.h>
-static unsigned char held[10];
+static unsigned char held[WEB_KEY_COUNT];
 static unsigned long sequence[4], serial;
 static unsigned pressed;
 static int fire_pending, enter_pending, damage_pending, keys[2], count, cursor;
@@ -24,7 +24,7 @@ void web_reset(void)
 }
 void web_input(int key, int down)
 {
-    if (key < 0 || key >= 10) return;
+    if (key < 0 || key >= WEB_KEY_COUNT) return;
     down = !!down;
     if (down && !held[key]) {
         pressed |= 1u << key;
@@ -37,11 +37,17 @@ void web_input(int key, int down)
 }
 int web_take_press(int key)
 {
-    if (key < 0 || key >= 10) return 0;
+    if (key < 0 || key >= WEB_KEY_COUNT) return 0;
     unsigned bit = 1u << key;
     int result = !!(pressed & bit);
     pressed &= ~bit;
     return result;
+}
+int web_skip_pressed(void)
+{
+    int requested = web_take_press(10);
+    /* Q wins if both shortcuts arrive together; do not defer a rejected N. */
+    return requested && !damage_pending && !held[9];
 }
 int web_enter_pressed(void)
 {
