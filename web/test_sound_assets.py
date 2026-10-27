@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import wave
 
-from make_sounds import RATE, SOUNDS, build
+from make_sounds import MENU_MELODY, MENU_STEP_SECONDS, RATE, SOUNDS, build
 
 
 class SoundAssetsTest(unittest.TestCase):
@@ -26,7 +26,17 @@ class SoundAssetsTest(unittest.TestCase):
             build(b)
             manifest = json.loads((a / "manifest.json").read_text())
             self.assertEqual(set(manifest), {str(i) for i in range(1, 17)})
-            self.assertEqual(len(list(a.glob("*.wav"))), 16)
+            self.assertEqual(len(list(a.glob("[0-9]*.wav"))), 16)
+            menu_a = a / "menu.wav"
+            menu_b = b / "menu.wav"
+            self.assertEqual(menu_a.read_bytes(), menu_b.read_bytes())
+            with wave.open(str(menu_a), "rb") as wav:
+                self.assertEqual(wav.getnchannels(), 1)
+                self.assertEqual(wav.getsampwidth(), 2)
+                self.assertEqual(wav.getframerate(), RATE)
+                self.assertEqual(wav.getnframes(), int(RATE * MENU_STEP_SECONDS * len(MENU_MELODY)))
+                self.assertGreater(max(abs(x) for x in struct.unpack(
+                    "<" + "h" * wav.getnframes(), wav.readframes(wav.getnframes()))), 0)
             for event, sound in enumerate(SOUNDS, 1):
                 entry = manifest[str(event)]
                 self.assertEqual(entry, {"name": sound[0], "src": str(event) + ".wav"})

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include "terminal.h"
 #include "audio.h"
-/* Browser-only compatibility boundary: known SoX requests become bounded IDs.
-   No shell execution; actual browser audio is a separate, still-pending step. */
+/* Browser-only compatibility boundary: known legacy requests become bounded IDs.
+   No shell execution; the browser consumes queued IDs through Howler.js. */
 #define system(command) web_audio_system(command)
 #endif

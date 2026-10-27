@@ -74,6 +74,10 @@ static void new_game(void)
 /* Matches the original respawn; body collisions do not clear projectiles. */
 static void take_damage(int reset_projectiles)
 {
+    if (som_ativo)
+        system(reset_projectiles
+            ? "play -q -n synth 0.06 sine 220:110 synth 0.06 sine 220:110 vol 0.4 > /dev/null 2>&1 &"
+            : "play -q -n synth 0.08 sine 200:150 synth 0.08 sine 200:150 vol 0.4 > /dev/null 2>&1 &");
     --player.vidas;
     if (player.vidas <= 0) {
         phase = GAME_OVER;
@@ -96,6 +100,8 @@ static void reward(void)
             int y = rows[i];
             if (y >= 0 && y < ALTURA_TELA && mapa[y][x] == ' ') {
                 mapa[y][x] = '+';
+                if (som_ativo)
+                    system("play -q -n synth 0.05 square 800 vol 0.15 > /dev/null 2>&1 &");
                 break;
             }
         }
@@ -116,7 +122,11 @@ static void tick(void)
     if (player.vidas <= 0) { phase = GAME_OVER; return; }
     int end = configuracao_niveis[level].comprimento_mapa - LARGURA_TELA;
     if (offset >= end) {
-        if (boss.ativo == 0) boss.ativo = 1;
+        if (boss.ativo == 0) {
+            if (som_ativo)
+                system("play -q -n synth 0.12 square 440 : synth 0.12 square 440 : synth 0.12 square 440 : synth 0.35 square 280 vol 0.30 > /dev/null 2>&1 &");
+            boss.ativo = 1;
+        }
         if (boss.ativo == 1 && player.imunidade <= 0 &&
             player.x >= boss.x && player.x <= boss.x + 2 &&
             player.y >= boss.y - 1 && player.y <= boss.y + 1) {
@@ -137,6 +147,8 @@ static void tick(void)
                     if (player.vidas < MAX_VIDAS_JOGADOR) ++player.vidas;
                     player.pontuacao += 500;
                     mapa[player.y][x] = ' ';
+                    if (som_ativo)
+                        system("play -q -n synth 0.20 sine 600:1800 vol 0.35 > /dev/null 2>&1 &");
                 } else if (player.imunidade <= 0 && (cell == '#' || cell == 'O' || cell == 'x')) {
                     take_damage(1);
                 }
@@ -209,9 +221,13 @@ static void frame(void)
 }
 int main(void)
 {
-    som_ativo = 0;
+    som_ativo = 1;
     init_game();
     show_menu();
     emscripten_set_main_loop(frame, 0, 0);
     return 0;
+}
+int web_menu_active(void)
+{
+    return phase == MENU;
 }

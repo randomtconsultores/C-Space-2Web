@@ -1,7 +1,7 @@
 #ifndef WEB_AUDIO_H
 #define WEB_AUDIO_H
 #define WEB_AUDIO_CAPACITY 16
-/* Stable scalar IDs for the future browser consumer; append, do not renumber. */
+/* Stable scalar IDs for the browser consumer; append, do not renumber. */
 enum WebAudioEvent {
     WEB_AUDIO_NONE = 0,
     WEB_AUDIO_PICKUP = 1,

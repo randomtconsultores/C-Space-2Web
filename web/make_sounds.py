@@ -27,6 +27,13 @@ SOUNDS = [
     ("BOSS_ENTRY", "square", .71, 440, 280, .30),
     ("BODY_DAMAGE", "sine", .16, 200, 150, .40),
 ]
+MENU_MELODY = [
+    523.25, 783.99, 659.25, 1046.50, 880.00, 659.25, 783.99, 523.25,
+    587.33, 880.00, 698.46, 1174.66, 987.77, 783.99, 698.46, 587.33,
+    523.25, 659.25, 783.99, 1046.50, 1174.66, 1046.50, 783.99, 659.25,
+    587.33, 698.46, 880.00, 1174.66, 1046.50, 880.00, 698.46, 587.33,
+]
+MENU_STEP_SECONDS = .16
 
 
 def pcm(event, sound):
@@ -50,6 +57,23 @@ def pcm(event, sound):
     return bytes(data)
 
 
+def menu_pcm():
+    count = int(RATE * MENU_STEP_SECONDS * len(MENU_MELODY))
+    data = bytearray()
+    for i in range(count):
+        t = i / RATE
+        step = min(int(t / MENU_STEP_SECONDS), len(MENU_MELODY) - 1)
+        local = t - step * MENU_STEP_SECONDS
+        phase = 2 * math.pi * MENU_MELODY[step] * local
+        melody = 1.0 if math.sin(phase) >= 0 else -1.0
+        bass_phase = 2 * math.pi * MENU_MELODY[(step // 4 * 4) % len(MENU_MELODY)] * local / 4
+        bass = math.sin(bass_phase)
+        envelope = min(1.0, local / .008, (MENU_STEP_SECONDS - local) / .018)
+        sample = round(32767 * .12 * envelope * (melody * .65 + bass * .35))
+        data.extend(struct.pack("<h", max(-32767, min(32767, sample))))
+    return bytes(data)
+
+
 def build(output):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
@@ -63,6 +87,11 @@ def build(output):
             wav.writeframes(pcm(event, sound))
         manifest[str(event)] = {"name": sound[0], "src": name}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    with wave.open(str(output / "menu.wav"), "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(RATE)
+        wav.writeframes(menu_pcm())
 
 
 if __name__ == "__main__":

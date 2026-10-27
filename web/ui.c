@@ -2,6 +2,7 @@
 #include "menu.h"
 #include "terminal.h"
 #include "controls.h"
+#include "audio.h"
 enum MenuPage { MAIN_PAGE, CONTROLS_PAGE, CAPTURE_PAGE, CREDITS_PAGE, NOTICE_PAGE };
 static enum MenuPage page;
 static int selection, control_selection;
@@ -23,6 +24,10 @@ enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
     }
     if (page == CONTROLS_PAGE) {
         if (back) { page = MAIN_PAGE; return WEB_MENU_NONE; }
+        if (enter && control_selection == 0) {
+            web_set_sound(!som_ativo);
+            return WEB_MENU_NONE;
+        }
         if (up && control_selection > 0) --control_selection;
         if (down && control_selection < 5) ++control_selection;
         if (enter && control_selection > 0) {
@@ -48,6 +53,16 @@ enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
     }
     return WEB_MENU_NONE;
 }
+void web_set_sound(int enabled)
+{
+    enabled = !!enabled;
+    if (som_ativo && !enabled) web_audio_clear();
+    som_ativo = enabled;
+}
+int web_sound_enabled(void)
+{
+    return som_ativo != 0;
+}
 void web_menu_render(void)
 {
     web_clear();
@@ -67,7 +82,7 @@ void web_menu_render(void)
         mvprintw(cy + 2, 3, "ENTER / ESC: return to menu");
     } else if (page == CONTROLS_PAGE) {
         mvprintw(2, 7, "SETTINGS & CONTROLS");
-        mvprintw(4, 3, "%s SOUND: OFF (not migrated)", control_selection == 0 ? "->" : "  ");
+        mvprintw(4, 3, "%s SOUND: [%s]", control_selection == 0 ? "->" : "  ", som_ativo ? "ON" : "OFF");
         for (int i = 0; i < 5; ++i) {
             int key = web_control_key(i);
             const char *mark = control_selection == i + 1 ? "->" : "  ";

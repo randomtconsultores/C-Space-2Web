@@ -4,3 +4,4 @@ int tecla_down = 's';
 int tecla_left = 'a';
 int tecla_right = 'd';
 int tecla_fire = ' ';
+int som_ativo;
