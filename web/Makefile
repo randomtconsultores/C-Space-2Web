@@ -40,5 +40,6 @@ test-sound-assets:
 test-js:
 	$(NODE) --check web/browser.js
 	$(NODE) web/test_browser.js
+	$(NODE) web/test_n_shortcut.js
 serve: all
 	$(PYTHON) -m http.server 8000 --bind 0.0.0.0 --directory $(OUT)

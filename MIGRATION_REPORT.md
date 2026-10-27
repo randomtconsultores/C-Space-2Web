@@ -1,29 +1,45 @@
-# Migration report — Web audio integration candidate
+# Migration report — N keyboard integration candidate
 
 Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
-Browser-playtested baseline remains e6cfff1ab0768dde831ab13ee999c7db20cba820.
-Latest Codespace test/build baseline is a5a5f1b16019f855716a110104cde455f11f9486.
+This candidate builds on C shortcut commit 5d9a4036515e899371bef13d53bbc75690ab3635.
 
-## User-reported validation update
-User reports clean migration/wasm before pull, fast-forward to the exact a5a5f1b SHA, test and test-js passed, Wasm build passed, no errors. No server started. This validates repository tests/build including intro/transitions, not visual browser acceptance. The assistant did not operate Codespace or that browser.
+## Accepted audio baseline
+Audio at c5fe243cce653cf7fc1325355660abebf7e73f0d was confirmed in game by the
+user on 2026-10-27. This includes the requested menu music and SOUND initially
+ON. Do not treat audio implementation as pending. Earlier C/assets/JS tests and
+forced Wasm build were reported passed in Codespace for the matching audio code.
+This is scoped acceptance, not a full progression/collision audit.
 
-## Current working increment: Web audio integration
-Using the existing audio bridge and sound generator, the Web build now generates all 16 WAV files and their manifest. Howler maps C event IDs to those files and drains the bounded FIFO with an explicit eight-voice maximum.
-The Web Controls menu toggles SOUND, which starts on. An original chiptune loops in the menu. Turning sound off, blurring the window or hiding the tab stops active sounds and clears queued events. web/main.c now emits the legacy player-damage, body-damage, reward-spawn, boss-entry and pickup events that were absent from the Web port. No native sources, gameplay rules, MAX_NIVEIS=4 or persistence are changed; no SoX parsing was added.
-This working tree is based on 947ecbb. C/assets/JS tests passed, `make -B -f web/Makefile` passed, and the user confirmed audible browser playback after Howler preload was enabled. The local browser diagnostics expose WAV loads, C events, play calls, errors, volume and AudioContext state.
+## Current increment
+browser.js extends the existing held counts to 11 and maps N/n to index 10.
+No parallel input system is introduced. Existing control capture still handles
+reserved N, modifiers are ignored, repeated keydowns do not emit extra presses,
+and focus reset clears the held state. The status line explains N/Q.
+web/test_n_shortcut.js is added to make test-js. Existing audio/input tests remain
+unchanged. See web/N_SHORTCUT.md for C semantics and browser acceptance steps.
 
-## Executed tests for this candidate
-Assistant environment: isolated C11 units passed with Wall/Wextra/Werror, also ASan/UBSan. Covered all 16 mappings, system macro interception, unknown/null rejection, FIFO ordering, overflow without overwriting old events, wraparound, 10000 enqueue/take cycles, clear/reuse and unchanged rand sequence. Supporting terminal/runtime/framebuffer headers were locally transcribed and Git-blob-hash matched against retrieved repository versions. No complete checkout or Emscripten build in this environment; emcc unavailable.
+## Evidence and limitations
+- C stage: isolated runtime tests passed locally with Wall/Wextra/Werror and
+  ASan/UBSan. Controls/framebuffer/terminal matched repository blob hashes;
+  space.h/globals were local fixtures. Main routing was inspected only.
+- This JS stage: node --check, existing browser regression and focused N tests
+  executed and passed with mock DOM. They are not real browser playtests.
+- Full Wasm build, native rebuild and N browser acceptance were NOT executed
+  by this assistant. Copilot/Codespace validation is still required.
+- Prior SDK baseline: Emscripten 6.0.13, SDK Node v24.19.0. Earlier native make -B
+  passed with 26 system-result warnings and one fread-result warning.
 
-## Earlier evidence retained
-Original native game tested on user PC. Codespace native baseline make -B passed with 26 system-result warnings and one fread-result warning. Emscripten 6.0.13 and SDK Node v24.19.0 supported prior Web builds. User confirmed initial gameplay/menu/remapping and Enter/Escape/Q fixes; browser/version unrecorded. HEAPU8 fixed at 183017f, numpad Enter at a510b1e, Escape/Q at e6cfff1; PATH Node issue worked around with NODE="$EMSDK_NODE".
-
-## Validation and limits
-The current validation commands are:
-```
+## Reproduction
 source "$HOME/emsdk/emsdk_env.sh"
 make -f web/Makefile test test-js NODE="$EMSDK_NODE"
-make -f web/Makefile
-```
-For real playback, serve port 8000, enable SOUND under Controls and trigger an existing game event such as taking damage or collecting a + pickup. The browser must be able to load Howler.js from its CDN; browser autoplay policy requires user interaction. Do not invent a player-fire sound: process_input has no such native request. Ranking celebration/audio stays deferred with persistence.
-Visual intro/transitions, complete levels/collisions, console/network and final native regression remain pending. Persistence is last; LOAD/ranking are notices, bindings session-only, N debug pending. Fourth-level configuration/AI remains incomplete. Migration is not complete.
+make -B -f web/Makefile
+
+Do not discard local changes when updating; reuse the existing private server.
+MAX_NIVEIS=4, sound defaults, native gameplay files and persistence are unchanged.
+The incomplete fourth level remains an inherited error. Full boss/collision,
+progression, intro/transition, touch, console/network and final native regression
+checks remain pending where not explicitly validated. Persistence is last;
+LOAD/ranking/celebration remain deferred. Migration is not complete.
+
+Assistant owns implementation/review/commits; Copilot performs validation only;
+user owns in-game acceptance and merges.

@@ -221,7 +221,7 @@ var Module = {
         };
         var special = {Enter: 5, NumpadEnter: 5, Escape: 6, ArrowUp: 7, ArrowDown: 8};
         var pressed = new Map();
-        var heldCounts = new Uint8Array(10);
+        var heldCounts = new Uint8Array(11);
         var touchControls = document.getElementById("touch-controls");
         var soundButton = document.getElementById("sound-toggle");
         var testSoundButton = document.getElementById("audio-test");
@@ -325,6 +325,7 @@ var Module = {
                 return [special[event.code]];
             var key = character(event), result = [];
             if (key === 113) result.push(9);
+            if (key === 110) result.push(10);
             /* Keep original W/S menu navigation independent of game bindings. */
             if (key === 119) result.push(7);
             if (key === 115) result.push(8);
@@ -363,6 +364,6 @@ var Module = {
             if (document.hidden) reset();
             else handlePageFocus();
         });
-        statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Esc recua/cancela. Som opcional em Controls.";
+        statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Esc recua/cancela. Som em Controls. N: arena do boss; Q: dano.";
     }
 };
