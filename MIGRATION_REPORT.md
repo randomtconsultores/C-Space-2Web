@@ -1,45 +1,44 @@
-# Migration report — N keyboard integration candidate
+# Migration report — persistence foundation candidate (1/8)
 
 Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
-This candidate builds on C shortcut commit 5d9a4036515e899371bef13d53bbc75690ab3635.
+Base: 5b5676235bd42092181b64a315cb9d80b1615dc8.
 
-## Accepted audio baseline
-Audio at c5fe243cce653cf7fc1325355660abebf7e73f0d was confirmed in game by the
-user on 2026-10-27. This includes the requested menu music and SOUND initially
-ON. Do not treat audio implementation as pending. Earlier C/assets/JS tests and
-forced Wasm build were reported passed in Codespace for the matching audio code.
-This is scoped acceptance, not a full progression/collision audit.
+## Accepted evidence
+User confirmed intro, three configured levels/bosses, combat/collisions,
+immunity, lives, score, progression/transitions, N, audio, touch and console/network.
+Copilot reported C/Python/JS tests and forced Wasm build passed at that SHA,
+with clean Git status. Menu music and default SOUND ON are accepted.
+These gameplay checks are not being reclassified as pending.
 
-## Current increment
-browser.js extends the existing held counts to 11 and maps N/n to index 10.
-No parallel input system is introduced. Existing control capture still handles
-reserved N, modifiers are ignored, repeated keydowns do not emit extra presses,
-and focus reset clears the held state. The status line explains N/Q.
-web/test_n_shortcut.js is added to make test-js. Existing audio/input tests remain
-unchanged. See web/N_SHORTCUT.md for C semantics and browser acceptance steps.
+## Candidate
+New server package with Flask app factory, explicit transactional SQLite init,
+versioned sessions/checkpoints schema, read-only health and bounded static file
+serving. Missing/foreign/incompatible storage is refused, not reset by requests.
+Database path must be absolute and outside WEB_ROOT; new POSIX files use 0600.
+Only init-db creates storage. HTTP session/checkpoint/ranking writes are absent;
+phase 2 must add their protections before exposing them. No native game files,
+Wasm build, browser JS, audio or running-server changes are included.
 
-## Evidence and limitations
-- C stage: isolated runtime tests passed locally with Wall/Wextra/Werror and
-  ASan/UBSan. Controls/framebuffer/terminal matched repository blob hashes;
-  space.h/globals were local fixtures. Main routing was inspected only.
-- This JS stage: node --check, existing browser regression and focused N tests
-  executed and passed with mock DOM. They are not real browser playtests.
-- Full Wasm build, native rebuild and N browser acceptance were NOT executed
-  by this assistant. Copilot/Codespace validation is still required.
-- Prior SDK baseline: Emscripten 6.0.13, SDK Node v24.19.0. Earlier native make -B
-  passed with 26 system-result warnings and one fread-result warning.
+## Verification actually executed here
+Python 3.12.8 / SQLite 3.46.1: eight database tests passed with temporary files.
+Coverage: idempotent init, noncreating reads, constraints/foreign keys, rejection
+without resetting future/foreign databases, DDL rollback, concurrent init and
+URI characters/new-file permissions. All Python files passed AST parsing.
+Flask is not installed in the assistant environment: five Flask/HTTP tests were
+written but NOT executed here. No listening HTTP server, Codespace integration,
+browser test or native/Wasm build was run for this candidate.
 
-## Reproduction
-source "$HOME/emsdk/emsdk_env.sh"
-make -f web/Makefile test test-js NODE="$EMSDK_NODE"
-make -B -f web/Makefile
+## Codespace validation after publication
+Use the isolated environment and run both test modules in server/CONTRACT.md.
+Report Python/SQLite/Flask versions and test results. Do not change code, initialize
+a real database, or start/stop the current port 8000 server for this validation.
+An actual network smoke test remains pending after the Flask tests pass.
 
-Do not discard local changes when updating; reuse the existing private server.
-MAX_NIVEIS=4, sound defaults, native gameplay files and persistence are unchanged.
-The incomplete fourth level remains an inherited error. Full boss/collision,
-progression, intro/transition, touch, console/network and final native regression
-checks remain pending where not explicitly validated. Persistence is last;
-LOAD/ranking/celebration remain deferred. Migration is not complete.
-
-Assistant owns implementation/review/commits; Copilot performs validation only;
+## Remaining
+Persistence is not complete: LOAD/ranking are unconnected. Sessions/security,
+checkpoint routes, JS/C integration, ranking, celebration, backup/recovery and
+production deployment checks follow in commits 2..8. WAL is not enabled here.
+Disk, secrets, existing permissions and backups require explicit operator policy.
+MAX_NIVEIS=4 and the missing fourth configuration are unchanged. Final native
+regression remains for closure. Copilot validates; assistant codes/commits;
 user owns in-game acceptance and merges.
