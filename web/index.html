@@ -8,13 +8,30 @@
     body { margin: 1.5rem; background: #101410; color: #9aff9a; font-family: monospace; }
     #screen { display: block; overflow-x: auto; white-space: pre; font: 18px/1.2 monospace; }
     #status { white-space: pre-wrap; }
+    #audio-status { white-space: pre-wrap; font-size: .85rem; }
+    #touch-controls { display: flex; flex-wrap: wrap; gap: .4rem; max-width: 34rem; margin-top: 1rem; }
+    #touch-controls button { min-width: 3rem; min-height: 2.75rem; touch-action: manipulation; }
   </style>
 </head>
 <body>
   <h1>Space Game C</h1>
-  <p>Versão incremental: jogabilidade em C. Menus completos, áudio e persistência ainda pendentes.</p>
+  <p>Versão incremental: jogabilidade em C. Áudio opcional; persistência pendente.</p>
   <p id="status" role="status">A carregar WebAssembly…</p>
+  <p id="audio-status" role="status">Audio: a inicializar</p>
   <pre id="screen" aria-label="Space Game C ASCII"></pre>
+  <div id="touch-controls" aria-label="Controlos tácteis">
+    <button id="sound-toggle" type="button" aria-pressed="false">SOUND OFF</button>
+    <button id="audio-test" type="button">TEST SOUND (13)</button>
+    <button type="button" data-action="0" aria-label="Cima">Cima</button>
+    <button type="button" data-action="1" aria-label="Baixo">Baixo</button>
+    <button type="button" data-action="2" aria-label="Esquerda">Esquerda</button>
+    <button type="button" data-action="3" aria-label="Direita">Direita</button>
+    <button type="button" data-action="5">Enter</button>
+    <button type="button" data-action="6">Esc</button>
+    <button type="button" data-action="4" aria-label="Disparar">Fire</button>
+    <button type="button" data-action="9">Q</button>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="browser.js"></script>
   <script async src="space.js" onerror="spaceLoadError()"></script>
 </body>
