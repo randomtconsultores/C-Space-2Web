@@ -97,18 +97,34 @@ class ApiTest(unittest.TestCase):
         csrf, _ = self.session()
         headers = self.auth(csrf)
         for key in self.value:
-            self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers,
-                                      json=dict(self.value, **{key: True}))[0], 422)
-        for value in (dict(self.value, score=0.0), dict(self.value, lives=0),
-                      dict(self.value, level_index=4), dict(self.value, revision=1)):
-            self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers, json=value)[0], 422)
-        for raw, content_type, expected in (("{}", "text/plain", 415), ("{", "application/json", 400),
-                                           ('{"x":1,"x":2}', "application/json", 400),
-                                           ('{"x":NaN}', "application/json", 400),
-                                           ("[" * 1500 + "]" * 1500, "application/json", 400),
-                                           (" " * 5000, "application/json", 413)):
-            self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers,
-                                      data=raw, content_type=content_type)[0], expected)
+            with self.subTest(case="boolean", field=key):
+                self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers,
+                                          json=dict(self.value, **{key: True}))[0], 422)
+        for index, value in enumerate((dict(self.value, score=0.0), dict(self.value, lives=0),
+                                       dict(self.value, level_index=4), dict(self.value, revision=1))):
+            with self.subTest(case="invalid_fields", index=index):
+                self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers, json=value)[0], 422)
+        cases = (
+            ("media_type", "{}", "text/plain", 415),
+            ("syntax", "{", "application/json", 400),
+            ("duplicate_key", '{"x":1,"x":2}', "application/json", 400),
+            ("non_finite", '{"x":NaN}', "application/json", 400),
+            ("array_shape", "[" * 64 + "]" * 64, "application/json", 422),
+            ("size_limit", " " * 5000, "application/json", 413),
+        )
+        for name, raw, content_type, expected in cases:
+            with self.subTest(case=name):
+                self.assertEqual(self.call("PUT", "/api/v1/checkpoint", headers=headers,
+                                          data=raw, content_type=content_type)[0], expected)
+        with self.subTest(case="decoder_recursion"):
+            with patch("server.api.json.loads", side_effect=RecursionError):
+                # Do not use call/get_json while the shared decoder is patched.
+                with self.client.open("/api/v1/checkpoint", method="PUT", base_url=ORIGIN,
+                                      headers=headers, data="{}", content_type="application/json") as response:
+                    self.assertEqual(response.status_code, 400)
+                    self.assertIn('"bad_json"', response.get_data(as_text=True))
+        with connection(self.database, readonly=True) as con:
+            self.assertEqual(con.execute("SELECT count(*) FROM checkpoints").fetchone()[0], 0)
 
     def test_expiry_does_not_delete_storage(self):
         with patch("server.api.time.time", return_value=100):

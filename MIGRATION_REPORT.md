@@ -31,10 +31,31 @@ During API preparation: syntax and isolated stdlib origin/HMAC/strict-JSON helpe
 checks passed, not HTTP tests. For this cleanup: all Python files parsed; the
 8 updated database tests passed locally with tracemalloc/ResourceWarning enabled
 on Python 3.12.8 / SQLite 3.46.1, with no warnings reported in that run.
-Flask is absent locally. The 5 updated HTTP regression tests and 10 API tests
-were NOT run here. No claim is made that the reported warning is resolved on
-Python 3.14 until Codespace confirms the complete suite. Real session/checkpoint
-HTTP smoke test is also pending. Do not enable public writes before acceptance.
+Flask is absent locally: HTTP tests were not executed by the assistant.
+The user/Copilot subsequently tested aa12b2f134cd65010fca998efc518e4fe2e0d2bd
+in a fresh temporary clone, Python 3.14.2 / SQLite 3.45.1 / Flask 3.1.3:
+23 tests executed, 22 passed, 1 failed; no ResourceWarning was emitted. Git status
+was clean and synchronized. No real database/listener/old checkout was touched.
+The failure was test_json_types_limits_and_duplicates, actual 422 versus expected
+400. Stage 2 is not accepted yet. Real session/checkpoint HTTP smoke is pending;
+do not enable public writes before acceptance.
+
+## Deterministic JSON test correction
+The old fixture used 1500 nested arrays (valid JSON), assuming decoding must raise
+RecursionError and yield 400. Such a parser limit is not an application guarantee:
+if decoding succeeds, a list correctly fails the checkpoint object schema (422).
+The assistant also decoded that old fixture successfully with local Python 3.12.8;
+this is not asserted to be a Python-3.14-only change or a storage failure.
+The replacement uses 64 nested arrays with exact expected 422. Named subtests
+identify each rejection case. A forced decoder RecursionError separately checks
+400/bad_json using a raw request and text response, avoiding the patched decoder
+in the test client's own get_json. All rejected requests must leave checkpoints
+empty. Malformed JSON/duplicate keys/NaN retain exact 400; body size retains 413.
+Only this test method and this report change. API/security/schema are unchanged;
+no permissive (400,422) assertion and no warning suppression are introduced.
+AST parsing, unchanged-other-method comparison and fixture sanity checks passed
+locally. The HTTP correction itself has NOT been executed locally (Flask absent).
+A fresh 23-test Codespace run remains required before claiming full success.
 
 ## Next validation
 Run the 23-test command in server/CONTRACT.md in a clean clone/venv. Report full
