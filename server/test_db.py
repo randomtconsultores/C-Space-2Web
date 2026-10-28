@@ -1,3 +1,4 @@
+from contextlib import closing
 import concurrent.futures
 import os
 from pathlib import Path
@@ -56,9 +57,10 @@ class DatabaseTest(unittest.TestCase):
 
     def test_foreign_database_is_preserved(self):
         self.path.parent.mkdir()
-        with sqlite3.connect(self.path) as con:
+        with closing(sqlite3.connect(self.path)) as con:
             con.execute("CREATE TABLE precious (value TEXT)")
             con.execute("INSERT INTO precious VALUES ('keep')")
+            con.commit()
         before = self.path.read_bytes()
         with self.assertRaises(db.StoreError):
             db.init_database(self.path)

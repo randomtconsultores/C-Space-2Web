@@ -1,31 +1,30 @@
 # Migration plan
 
-Repository: randomtconsultores/C-Space-2Web. Branch: migration/wasm.
-Accepted in-game baseline: 5b5676235bd42092181b64a315cb9d80b1615dc8.
-User confirmed intro, three configured levels/bosses, combat/collisions,
-immunity, lives, score, progression/transitions, N, audio, touch and console/network.
-Copilot reported C/Python/JS tests and forced Wasm build passed with a clean tree.
-These accepted checks are not pending again.
+Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
+Accepted game baseline: 5b567623. User validated intro, three configured levels,
+bosses, collisions/immunity, lives/score, transitions/progression, N, audio,
+touch controls and console/network. Those playtests are not pending again.
 
-## Server persistence: eight planned commits
-1. Contract, SQLite schema/init and read-only API health (current candidate).
-2. Anonymous sessions/protected checkpoint API: ownership, CSRF/origin checks,
-   bounds, transactions and stale-write conflicts before exposing HTTP writes.
-3. Async JS adapter, errors and stale-response handling.
-4. Functional between-level Save/LOAD, preserving validated C state.
+## Persistence roadmap
+1. SQLite foundation/health: 9e2a9e6 validated in Codespace (13 tests) and real
+   loopback HTTP, including no creation before init and integrity/FK checks.
+2. Sessions/checkpoints: core a79e276 published; resource-cleanup/docs follow-up
+   prepared. Eight updated SQL tests passed locally. Fifteen HTTP tests and real
+   checkpoint HTTP smoke test require Codespace validation before acceptance.
+3. Async JS adapter, error/cancellation and stale-response handling.
+4. Functional between-level Save/LOAD without erasing validated C state.
 5. Nine-entry ranking API, stable ties and duplicate protection.
 6. Nonblocking celebration, seven-character name capture and ranking UI.
-7. Backup/restoration, conflicts, unavailable storage/API and fault tests.
+7. Backup/recovery, lifecycle cleanup, conflicts and fault/deployment tests.
 8. Final native/Web/API regression, documentation and PR review before merge.
 
-## Current limits
-Only health/static HTTP routes and explicit CLI initialization are added now.
-The game still has no working Save/LOAD/ranking. SQLite stays private on the
-server; no browser SQLite, ORM, accounts, uploads, per-level history, persistent
-preferences or anti-cheat. No native/Web/audio or running-server changes.
-MAX_NIVEIS remains 4; missing fourth configuration stays explicit, not victory.
-Final native regression is a closing check, not new gameplay implementation.
-See server/CONTRACT.md for storage/schema/bounds and validation instructions.
+## Boundaries
+Server SQLite only, no browser database/ORM/accounts/uploads/per-level history,
+persistent preferences or anti-cheat. API is opt-in with configured HTTPS origin
+and secret. No current game, port 8000 or real storage is changed by these commits.
+LOAD/ranking remain unconnected. Keep MAX_NIVEIS=4; unavailable fourth level is
+explicit, not victory. Existing generated music and SOUND defaults are retained.
+See server/CONTRACT.md for API limits, session expiry and validation commands.
 
-Assistant implements/reviews/commits after approval. Copilot executes validation
-commands/tests only. User accepts gameplay and controls merges.
+Assistant implements/reviews/commits after approval. Copilot executes validations
+and commands only. User owns gameplay acceptance and merges.

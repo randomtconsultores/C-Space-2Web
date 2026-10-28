@@ -1,44 +1,45 @@
-# Migration report — persistence foundation candidate (1/8)
+# Migration report — checkpoint API and resource cleanup (2/8)
 
 Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
-Base: 5b5676235bd42092181b64a315cb9d80b1615dc8.
+API core published as a79e2760325757c3e77bad2dfd117fe7f3bdf3f0.
 
-## Accepted evidence
-User confirmed intro, three configured levels/bosses, combat/collisions,
-immunity, lives, score, progression/transitions, N, audio, touch and console/network.
-Copilot reported C/Python/JS tests and forced Wasm build passed at that SHA,
-with clean Git status. Menu music and default SOUND ON are accepted.
-These gameplay checks are not being reclassified as pending.
+## Accepted baselines
+Game at 5b567623: user confirmed intro, configured levels/bosses, collisions,
+immunity, lives/score, progression/transitions, N, audio, touch and console/network.
+Foundation 9e2a9e6: user/Copilot reported 13 tests passed on Python 3.14.2,
+SQLite 3.45.1, Flask 3.1.3. Real loopback HTTP returned 503 without creating
+storage, then 200/no-store after explicit init; integrity_check=ok and FK check
+empty. Temporary listener/connection were closed; old checkout/8000 untouched.
 
-## Candidate
-New server package with Flask app factory, explicit transactional SQLite init,
-versioned sessions/checkpoints schema, read-only health and bounded static file
-serving. Missing/foreign/incompatible storage is refused, not reset by requests.
-Database path must be absolute and outside WEB_ROOT; new POSIX files use 0600.
-Only init-db creates storage. HTTP session/checkpoint/ranking writes are absent;
-phase 2 must add their protections before exposing them. No native game files,
-Wasm build, browser JS, audio or running-server changes are included.
+## Current scope
+Opt-in anonymous sessions, SHA-256 token storage, secure host cookie, session-bound
+HMAC CSRF, exact configured Origin/fetch metadata checks, strict bounded JSON,
+owner-only checkpoints, transactional revision conflicts and session quotas.
+No client owner/SQL/path is accepted. Session expiry does not delete stored rows.
+Without origin+secret, routes remain absent. This is not yet game Save/LOAD or a
+production-ready public service; HTTPS/private disk/backups/upstream limits matter.
 
-## Verification actually executed here
-Python 3.12.8 / SQLite 3.46.1: eight database tests passed with temporary files.
-Coverage: idempotent init, noncreating reads, constraints/foreign keys, rejection
-without resetting future/foreign databases, DDL rollback, concurrent init and
-URI characters/new-file permissions. All Python files passed AST parsing.
-Flask is not installed in the assistant environment: five Flask/HTTP tests were
-written but NOT executed here. No listening HTTP server, Codespace integration,
-browser test or native/Wasm build was run for this candidate.
+## Follow-up changes
+Tests now explicitly close file-backed HTTP responses and raw SQLite fixture
+connections. The foreign-database fixture commits before closing, preserving
+its test semantics. Production db.py/schema are unchanged and blob-verified.
+Default-server tests force disabled API configuration to avoid ambient secrets.
+Contract/roadmap now describe stage 2 and its pending acceptance accurately.
 
-## Codespace validation after publication
-Use the isolated environment and run both test modules in server/CONTRACT.md.
-Report Python/SQLite/Flask versions and test results. Do not change code, initialize
-a real database, or start/stop the current port 8000 server for this validation.
-An actual network smoke test remains pending after the Flask tests pass.
+## Executed versus pending
+During API preparation: syntax and isolated stdlib origin/HMAC/strict-JSON helper
+checks passed, not HTTP tests. For this cleanup: all Python files parsed; the
+8 updated database tests passed locally with tracemalloc/ResourceWarning enabled
+on Python 3.12.8 / SQLite 3.46.1, with no warnings reported in that run.
+Flask is absent locally. The 5 updated HTTP regression tests and 10 API tests
+were NOT run here. No claim is made that the reported warning is resolved on
+Python 3.14 until Codespace confirms the complete suite. Real session/checkpoint
+HTTP smoke test is also pending. Do not enable public writes before acceptance.
 
-## Remaining
-Persistence is not complete: LOAD/ranking are unconnected. Sessions/security,
-checkpoint routes, JS/C integration, ranking, celebration, backup/recovery and
-production deployment checks follow in commits 2..8. WAL is not enabled here.
-Disk, secrets, existing permissions and backups require explicit operator policy.
-MAX_NIVEIS=4 and the missing fourth configuration are unchanged. Final native
-regression remains for closure. Copilot validates; assistant codes/commits;
-user owns in-game acceptance and merges.
+## Next validation
+Run the 23-test command in server/CONTRACT.md in a clean clone/venv. Report full
+results/warnings and versions; do not edit code, print real credentials, initialize
+real storage or start/stop port 8000. Failures are fixed by the assistant.
+Native/Wasm/browser code, MAX_NIVEIS=4 and accepted audio defaults are unchanged.
+Remaining commits 3..8 cover JS/C integration, ranking/celebration, recovery and
+final regression. Persistence is not complete. User controls merges.
