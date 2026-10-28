@@ -1,66 +1,60 @@
-# Migration report — checkpoint API and resource cleanup (2/8)
+# Migration report — isolated persistence client (3/8)
 
 Repository: randomtconsultores/C-Space-2Web; branch migration/wasm.
-API core published as a79e2760325757c3e77bad2dfd117fe7f3bdf3f0.
+Client commit: 5610a4f8fa41a9c0ded87e5d910a37ca87ddaee1.
+Base: 2950a1f613c13f9f2b2a1854e85145218da1c900.
 
-## Accepted baselines
-Game at 5b567623: user confirmed intro, configured levels/bosses, collisions,
-immunity, lives/score, progression/transitions, N, audio, touch and console/network.
-Foundation 9e2a9e6: user/Copilot reported 13 tests passed on Python 3.14.2,
-SQLite 3.45.1, Flask 3.1.3. Real loopback HTTP returned 503 without creating
-storage, then 200/no-store after explicit init; integrity_check=ok and FK check
-empty. Temporary listener/connection were closed; old checkout/8000 untouched.
+## Accepted evidence
+Game baseline 5b567623: user accepted intro, configured levels/bosses, collisions,
+immunity, lives/score, transitions/progression, N, audio and touch.
+SQLite/health 9e2a9e6: 13 tests and real loopback HTTP accepted; missing storage
+was not created by requests; integrity/FKs passed after explicit temporary init.
+API core a79e276 and resource cleanup aa12b2f: first Codespace run was 22/23 with
+no warnings. The JSON test assumed a parser recursion limit that was not portable.
+2950a1f corrected that fixture without weakening the API. User/Copilot then
+reported 23/23 passed, no warnings, clean/synchronized Git status. Codespace
+versions previously reported: Python 3.14.2, SQLite 3.45.1, Flask 3.1.3.
+Real HTTP session/checkpoint smoke test has not been reported; remains pending.
 
-## Current scope
-Opt-in anonymous sessions, SHA-256 token storage, secure host cookie, session-bound
-HMAC CSRF, exact configured Origin/fetch metadata checks, strict bounded JSON,
-owner-only checkpoints, transactional revision conflicts and session quotas.
-No client owner/SQL/path is accepted. Session expiry does not delete stored rows.
-Without origin+secret, routes remain absent. This is not yet game Save/LOAD or a
-production-ready public service; HTTPS/private disk/backups/upstream limits matter.
+## Published scope
+5610a4f adds web/persistence.js and web/test_persistence.js. This follow-up updates
+only roadmap/report. No C, browser.js, index.html, Makefile, server code/schema or
+existing build assets change. The adapter is not loaded/copied by the game build
+yet; no automatic requests occur on script import. Game Save/LOAD/ranking remain
+unconnected. The initial combined code/docs push failed with connector HTTP 400;
+HEAD was checked unchanged. The separately approved two-file code push succeeded.
 
-## Follow-up changes
-Tests now explicitly close file-backed HTTP responses and raw SQLite fixture
-connections. The foreign-database fixture commits before closing, preserving
-its test semantics. Production db.py/schema are unchanged and blob-verified.
-Default-server tests force disabled API configuration to avoid ambient secrets.
-Contract/roadmap now describe stage 2 and its pending acceptance accurately.
+API: SpacePersistence.createClient() in a classic script, or CommonJS exports.
+Client methods: load(), save(snapshot), cancel(), getState(). load returns null
+only for checkpoint_missing, not disabled API. save requires successful load;
+caller supplies exactly format_version/level_index/lives/score, never owner or
+revision. Returned checkpoints and state are immutable copies. Level 3 is preserved.
+Requests use fixed relative endpoints, same-origin credentials/mode, no-store,
+redirect rejection and in-memory CSRF only. Cookie handling stays with the browser.
+Default whole-operation deadline: 10 seconds. Response UTF-8 JSON is bounded to
+4096 bytes and 4097 stream reads. Overlapping operations reject busy; no queues
+or automatic write retries. Cancellation rejects promptly and ignores late replies.
+Errors expose sanitized code/status/uncertain, not raw server or transport text.
+After failures the known revision is invalidated; an explicit load is required
+before another save. A possibly dispatched write may still commit after abort:
+uncertain=true means reconcile, not retry or assume rollback. Stage 4 must also
+check the UI/game generation before applying any already-resolved load result.
 
-## Executed versus pending
-During API preparation: syntax and isolated stdlib origin/HMAC/strict-JSON helper
-checks passed, not HTTP tests. For this cleanup: all Python files parsed; the
-8 updated database tests passed locally with tracemalloc/ResourceWarning enabled
-on Python 3.12.8 / SQLite 3.46.1, with no warnings reported in that run.
-Flask is absent locally: HTTP tests were not executed by the assistant.
-The user/Copilot subsequently tested aa12b2f134cd65010fca998efc518e4fe2e0d2bd
-in a fresh temporary clone, Python 3.14.2 / SQLite 3.45.1 / Flask 3.1.3:
-23 tests executed, 22 passed, 1 failed; no ResourceWarning was emitted. Git status
-was clean and synchronized. No real database/listener/old checkout was touched.
-The failure was test_json_types_limits_and_duplicates, actual 422 versus expected
-400. Stage 2 is not accepted yet. Real session/checkpoint HTTP smoke is pending;
-do not enable public writes before acceptance.
+## Executed and pending
+node --check web/persistence.js and node --test web/test_persistence.js passed
+locally: 13/13 tests on Node v20.20.1, no stderr warnings. Tests use injected fetch
+and deterministic timers with native Response/ReadableStream, not real HTTP or
+browser cookies. They cover lifecycle/revisions, security options, input/response
+bounds, HTTP errors, uncertainty, cancellation/timeouts, stalled bodies and late
+replies. This does not claim browser/C/HTTPS integration or backend HTTP acceptance.
+Copilot should rerun the new Node suite in the existing validated clone/venv after
+an approved fast-forward, without changing code or repeating accepted playtests.
+Codespace validation of the new client is pending, not claimed as passed.
 
-## Deterministic JSON test correction
-The old fixture used 1500 nested arrays (valid JSON), assuming decoding must raise
-RecursionError and yield 400. Such a parser limit is not an application guarantee:
-if decoding succeeds, a list correctly fails the checkpoint object schema (422).
-The assistant also decoded that old fixture successfully with local Python 3.12.8;
-this is not asserted to be a Python-3.14-only change or a storage failure.
-The replacement uses 64 nested arrays with exact expected 422. Named subtests
-identify each rejection case. A forced decoder RecursionError separately checks
-400/bad_json using a raw request and text response, avoiding the patched decoder
-in the test client's own get_json. All rejected requests must leave checkpoints
-empty. Malformed JSON/duplicate keys/NaN retain exact 400; body size retains 413.
-Only this test method and this report change. API/security/schema are unchanged;
-no permissive (400,422) assertion and no warning suppression are introduced.
-AST parsing, unchanged-other-method comparison and fixture sanity checks passed
-locally. The HTTP correction itself has NOT been executed locally (Flask absent).
-A fresh 23-test Codespace run remains required before claiming full success.
-
-## Next validation
-Run the 23-test command in server/CONTRACT.md in a clean clone/venv. Report full
-results/warnings and versions; do not edit code, print real credentials, initialize
-real storage or start/stop port 8000. Failures are fixed by the assistant.
-Native/Wasm/browser code, MAX_NIVEIS=4 and accepted audio defaults are unchanged.
-Remaining commits 3..8 cover JS/C integration, ranking/celebration, recovery and
-final regression. Persistence is not complete. User controls merges.
+## Workspace discipline
+User confirmed old tmp.3gjWI6vRHR clone/venv and its parent removed. Reuse the clean
+validated clone under tmp.PEzCB8T8me; create no more clones. Keep original checkout
+at 5b567623 and its five local modifications intact. No real databases or listeners
+were created for these Node tests. Do not touch port 8000 or use broad temp cleanup.
+Remaining stages: C/build integration (4), ranking (5), celebration/UI (6), recovery
+(7), final regression/docs (8). Persistence is not complete; merges remain user-owned.
