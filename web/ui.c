@@ -46,6 +46,7 @@ enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
     if (!enter) return WEB_MENU_NONE;
     switch (selection) {
     case OPCAO_PLAY: return WEB_MENU_PLAY;
+    case OPCAO_LOAD: return WEB_MENU_LOAD;
     case OPCAO_SAIR: return WEB_MENU_EXIT;
     case OPCAO_COMANDOS: page = CONTROLS_PAGE; control_selection = 0; break;
     case OPCAO_CREDITOS: page = CREDITS_PAGE; break;

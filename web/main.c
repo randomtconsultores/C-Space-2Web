@@ -6,12 +6,14 @@
 #include "ui.h"
 #include "intro.h"
 #include "transition.h"
+#include "persist_bridge.h"
 #include <emscripten.h>
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE };
 static enum Phase phase;
+static const char *load_notice;
 static char mapa[ALTURA_TELA][LARGURA_MAPA];
 static Projétil enemy_shots[MAX_TIROS_INIMIGO];
 static Player player;
@@ -63,6 +65,37 @@ static void show_menu(void)
     phase = MENU;
     web_menu_open();
     web_reset();
+}
+static void show_load_notice(const char *message)
+{
+    load_notice = message;
+    phase = LOAD_NOTICE;
+    web_reset();
+}
+static void handle_load_result(void)
+{
+    int kind, outcome, restored_level;
+    Player restored;
+    if (!web_persist_bridge_take_result(&kind, &outcome, &restored, &restored_level)) return;
+    if (kind != 1) {
+        show_load_notice("Unexpected LOAD result.");
+        return;
+    }
+    if (outcome == 1) {
+        long threshold = restored.proximo_patamar_pontos;
+        player = restored;
+        level = restored_level;
+        begin_level();
+        player.proximo_patamar_pontos = threshold;
+        return;
+    }
+    switch (outcome) {
+    case 0: show_load_notice("No checkpoint saved."); break;
+    case -2: show_load_notice("Invalid checkpoint."); break;
+    case -3: show_menu(); break;
+    case -4: show_load_notice("Checkpoint level unavailable."); break;
+    default: show_load_notice("Unable to load checkpoint."); break;
+    }
 }
 static void new_game(void)
 {
@@ -167,6 +200,18 @@ static void render(void)
 {
     if (phase == INTRO || phase == TRANSITION) return; /* Timed sequences own the framebuffer. */
     if (phase == MENU) { web_menu_render(); return; }
+    if (phase == LOAD_PENDING) {
+        web_clear();
+        mvprintw(5, 2, "Loading...");
+        mvprintw(7, 2, "ESC: cancel");
+        return;
+    }
+    if (phase == LOAD_NOTICE) {
+        web_clear();
+        mvprintw(5, 2, "%s", load_notice ? load_notice : "Unable to load checkpoint.");
+        mvprintw(7, 2, "ENTER / ESC: return to menu");
+        return;
+    }
     if (phase == CLOSED) {
         web_clear();
         mvprintw(6, 4, "SESSION CLOSED");
@@ -196,6 +241,7 @@ static void frame(void)
 {
     double now = emscripten_get_now();
     int enter = web_enter_pressed();
+    int loading_frame = phase == LOAD_PENDING;
     if (phase == MENU) {
         int up = web_take_press(0) | web_take_press(7);
         int down = web_take_press(1) | web_take_press(8);
@@ -205,17 +251,33 @@ static void frame(void)
             web_intro_begin(now);
             phase = INTRO;
         }
+        else if (action == WEB_MENU_LOAD) {
+            if (web_persist_begin_load() > 0) {
+                phase = LOAD_PENDING;
+                web_reset();
+            } else show_load_notice("Unable to start LOAD.");
+        }
         else if (action == WEB_MENU_EXIT) { phase = CLOSED; web_reset(); }
     } else if (phase == INTRO) {
         if (web_intro_update(now)) new_game();
     } else if (phase == TRANSITION) {
         if (web_transition_update(now)) advance_level();
+    } else if (phase == LOAD_PENDING) {
+        if (web_take_press(6)) {
+            /* Discard even a success that became ready before this frame. */
+            web_persist_cancel();
+            web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+            show_menu();
+        } else handle_load_result();
+    } else if (phase == LOAD_NOTICE) {
+        if (enter || web_take_press(6)) show_menu();
     } else if (enter && phase != PLAYING && phase != STAGE_CLEAR) {
         show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;
     int updates = web_steps(now, step);
-    for (int i = 0; i < updates && phase == PLAYING; ++i) tick();
+    /* Present a restored level before advancing its simulation. */
+    for (int i = 0; i < updates && phase == PLAYING && !loading_frame; ++i) tick();
     if (phase == STAGE_CLEAR) {
         web_reset();
         if (level < MAX_NIVEIS - 1) {
@@ -230,6 +292,7 @@ int main(void)
 {
     som_ativo = 1;
     init_game();
+    web_persist_bridge_init();
     show_menu();
     emscripten_set_main_loop(frame, 0, 0);
     return 0;

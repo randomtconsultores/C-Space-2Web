@@ -21,9 +21,10 @@ int main(void)
     web_menu_open(); select_down(20);
     assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_EXIT);
     web_menu_open(); select_down(1);
-    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_NONE);
+    assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_LOAD);
     web_menu_render();
-    assert(strstr((const char *)web_buffer(), "Persistence not migrated yet."));
+    assert(strstr((const char *)web_buffer(), "SPACE GAME C"));
+    assert(!strstr((const char *)web_buffer(), "Persistence not migrated yet."));
     assert(web_menu_update(0, 0, 0, 1) == WEB_MENU_NONE);
     web_menu_update(1, 0, 0, 0);
     assert(web_menu_update(0, 0, 1, 0) == WEB_MENU_PLAY);
