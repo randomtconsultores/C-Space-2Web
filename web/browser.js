@@ -218,6 +218,10 @@ var Module = {
                 Module.spaceRender = null;
             }
             drainAudio();
+            if (typeof SpacePersistenceBridge !== "undefined") {
+                try { SpacePersistenceBridge.poll(); }
+                catch (_e) { console.error("SpacePersistenceBridge poll failed"); }
+            }
         };
         var special = {Enter: 5, NumpadEnter: 5, Escape: 6, ArrowUp: 7, ArrowDown: 8};
         var pressed = new Map();
@@ -365,5 +369,9 @@ var Module = {
             else handlePageFocus();
         });
         statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Esc recua/cancela. Som em Controls. N: arena do boss; Q: dano.";
+        if (typeof SpacePersistenceBridge !== "undefined") {
+            try { SpacePersistenceBridge.init(Module); }
+            catch (_e) { console.error("SpacePersistenceBridge init failed"); }
+        }
     }
 };
