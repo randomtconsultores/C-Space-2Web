@@ -41,6 +41,9 @@ test-js:
 	$(NODE) --check web/browser.js
 	$(NODE) web/test_browser.js
 	$(NODE) web/test_n_shortcut.js
+	$(NODE) --check web/persistence_bridge.js
+	$(NODE) --check web/test_persistence_bridge.js
+	$(NODE) --test web/test_persistence_bridge.js
 test-persist-bridge:
 	@tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT HUP INT TERM; \
 	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -DWEB_PERSIST_TEST -I. -Iweb -fsanitize=address,undefined web/persist_bridge.c web/checkpoint.c levels.c web/test_persist_bridge.c -lm -o "$$tmp/bridge" && "$$tmp/bridge"
