@@ -11,7 +11,7 @@ MENU_MUSIC := $(OUT)/sounds/menu.wav
 SOURCES := web/main.c web/framebuffer.c web/runtime.c web/terminal.c web/ui.c web/controls.c web/intro.c web/transition.c web/audio.c space.c levels.c boss.c draw.c
 HEADERS := menu.h web/ui.h web/controls.h web/intro.h web/transition.h web/audio.h space.h levels.h boss.h draw.h web/framebuffer.h web/runtime.h web/terminal.h web/platform.h
 TEST_COMMON := web/framebuffer.c web/runtime.c web/terminal.c web/controls.c web/test_game_globals.c web/audio.c
-.PHONY: all check-toolchain test test-js test-sound-assets serve
+.PHONY: all check-toolchain test test-js test-sound-assets serve test-persist-bridge
 all: check-toolchain $(OUT)/space.js $(OUT)/space.wasm $(OUT)/index.html $(OUT)/browser.js $(SOUND_MANIFEST) $(SOUND_FILES) $(MENU_MUSIC)
 check-toolchain:
 	@command -v $(EMCC) >/dev/null 2>&1 || { echo "emcc not found; activate Emscripten before building."; exit 1; }
@@ -41,5 +41,8 @@ test-js:
 	$(NODE) --check web/browser.js
 	$(NODE) web/test_browser.js
 	$(NODE) web/test_n_shortcut.js
+test-persist-bridge:
+	@tmp=$$(mktemp -d) || exit 1; trap 'rm -rf "$$tmp"' EXIT HUP INT TERM; \
+	$(CC) -std=c11 -Wall -Wextra -Werror -O2 -DSPACE_WEB -DWEB_PERSIST_TEST -I. -Iweb -fsanitize=address,undefined web/persist_bridge.c web/checkpoint.c levels.c web/test_persist_bridge.c -lm -o "$$tmp/bridge" && "$$tmp/bridge"
 serve: all
 	$(PYTHON) -m http.server 8000 --bind 0.0.0.0 --directory $(OUT)
