@@ -157,8 +157,8 @@ class HttpSmokeTest(unittest.TestCase):
         self.assertEqual(status, 200)
         data = self._parse_json(body)
         self.assertEqual(data.get("status"), "ok")
-        self.assertIs(type(data.get("schema_version")), type(1))
-        self.assertEqual(data.get("schema_version"), 1)
+        self.assertIs(type(data.get("schema_version")), type(2))
+        self.assertEqual(data.get("schema_version"), 2)
 
         # 2. GET checkpoint without session -> 401 session_required
         status, headers, body = self._request("GET", "/api/v1/checkpoint")

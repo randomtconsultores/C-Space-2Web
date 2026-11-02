@@ -21,6 +21,8 @@ def create_app(config=None):
         SESSION_TTL=2592000,
         SESSION_CAPACITY=10000,
         SESSION_CREATE_LIMIT=30,
+        SESSION_SCORE_LIMIT=5,
+        SESSION_SCORE_WINDOW=60,
     )
     if config:
         app.config.update(config)
@@ -61,7 +63,7 @@ def create_app(config=None):
             init_database(database)
         except (sqlite3.Error, StoreError, OSError) as error:
             raise click.ClickException("Storage initialization refused or failed") from error
-        click.echo("SQLite schema v1 ready")
+        click.echo("SQLite schema v2 ready")
 
     @app.get("/")
     @app.get("/<path:name>")

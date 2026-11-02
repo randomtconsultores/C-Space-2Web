@@ -36,7 +36,7 @@ class ServerTest(unittest.TestCase):
         runner = self.app.test_cli_runner()
         self.assertEqual(runner.invoke(args=["init-db"]).exit_code, 0)
         self.assertEqual(runner.invoke(args=["init-db"]).exit_code, 0)
-        self.assertEqual(self.call("GET", "/api/v1/health")[:2], (200, {"status": "ok", "schema_version": 1}))
+        self.assertEqual(self.call("GET", "/api/v1/health")[:2], (200, {"status": "ok", "schema_version": 2}))
         self.assertEqual(self.call("POST", "/api/v1/health")[0], 405)
 
     def test_storage_failure_is_generic(self):

@@ -15,6 +15,8 @@ COOKIE = "__Host-space_session"
 FIELDS = ("format_version", "level_index", "lives", "score", "revision", "updated_at")
 BOUNDS = {"format_version": (1, 1), "level_index": (0, 3), "lives": (1, 9),
           "score": (0, 2147473647), "expected_revision": (0, 2147483646)}
+NAME_RE = re.compile(r"[A-Z0-9]{1,7}")
+SCORE_MAX = 2147473647
 
 
 class ApiError(Exception):
@@ -63,7 +65,9 @@ def configure_api(app):
         raise ValueError("API_SECRET requires at least 32 bytes; generate a random secret")
     secret = secret.encode("utf-8")
     limits = {}
-    for key, maximum in (("SESSION_TTL", 2592000), ("SESSION_CAPACITY", 100000), ("SESSION_CREATE_LIMIT", 1000)):
+    for key, maximum in (("SESSION_TTL", 2592000), ("SESSION_CAPACITY", 100000),
+                         ("SESSION_CREATE_LIMIT", 1000), ("SESSION_SCORE_LIMIT", 100),
+                         ("SESSION_SCORE_WINDOW", 3600)):
         value = app.config[key]
         if type(value) is not int or not 1 <= value <= maximum:
             raise ValueError("Invalid session limit configuration")
@@ -86,7 +90,7 @@ def configure_api(app):
         response.status_code = error.status
         if error.clear:
             response.delete_cookie(COOKIE, path="/", secure=True, httponly=True, samesite="Strict")
-        if error.code == "session_rate_limited":
+        if error.code == "session_rate_limited" or error.code == "session_score_limited":
             response.headers["Retry-After"] = "60"
         return response
 
@@ -144,6 +148,11 @@ def configure_api(app):
         supplied = request.headers.get("X-CSRF-Token", "")
         if re.fullmatch(r"[0-9a-f]{64}", supplied) is None or not hmac.compare_digest(supplied, csrf_for(secret, token)):
             raise ApiError(403, "csrf_rejected")
+        return key
+
+    def authenticate_session(con, now):
+        token = cookie()
+        key, _ = owner(con, token, now)
         return key
 
     def checkpoint(con, key):
@@ -210,5 +219,46 @@ def configure_api(app):
                          value["score"], revision + 1, now))
             result = checkpoint(con, key)
         return jsonify(checkpoint=result)
+
+    @bp.post("/scores")
+    def write_score():
+        now = int(time.time())
+        with storage(write=True) as con:
+            key = authenticate(con, now)
+            value = body()
+            if type(value) is not dict or set(value) != {"name", "score"}:
+                raise ApiError(422, "invalid_payload")
+            name = value["name"]
+            score = value["score"]
+            if type(name) is not str or not NAME_RE.fullmatch(name):
+                raise ApiError(422, "invalid_payload")
+            if type(score) is not int or not 0 <= score <= SCORE_MAX:
+                raise ApiError(422, "invalid_payload")
+            window_start = now - limits["SESSION_SCORE_WINDOW"]
+            count = con.execute(
+                "SELECT count(*) FROM scores WHERE session_hash=? AND created_at > ?",
+                (key, window_start)).fetchone()[0]
+            if count >= limits["SESSION_SCORE_LIMIT"]:
+                raise ApiError(429, "session_score_limited")
+            con.execute("INSERT INTO scores (session_hash, name, score, created_at) "
+                        "VALUES (?,?,?,?)", (key, name, score, now))
+            rowid = con.execute("SELECT last_insert_rowid()").fetchone()[0]
+            position = con.execute(
+                "SELECT count(*) + 1 FROM scores "
+                "WHERE (score > ?) OR (score = ? AND created_at < ?) "
+                "OR (score = ? AND created_at = ? AND id < ?)",
+                (score, score, now, score, now, rowid)).fetchone()[0]
+        return jsonify(name=name, score=score, position=position)
+
+    @bp.get("/scores")
+    def read_scores():
+        with storage() as con:
+            key = authenticate_session(con, int(time.time()))
+            rows = con.execute(
+                "SELECT name, score FROM scores "
+                "ORDER BY score DESC, created_at ASC, id ASC LIMIT 9").fetchall()
+        scores = [{"name": row["name"], "score": row["score"], "position": rank}
+                  for rank, row in enumerate(rows, start=1)]
+        return jsonify(scores=scores)
 
     app.register_blueprint(bp)

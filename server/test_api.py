@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
+import time
 from pathlib import Path
 import tempfile
 import unittest
@@ -144,6 +145,149 @@ class ApiTest(unittest.TestCase):
                                       headers={"Origin": ORIGIN}, json={})
             self.assertEqual((status, data["error"]["code"]), (429, code))
         self.assertEqual(self.session()[0], self.session()[0])
+
+    def test_scores_post_session_required(self):
+        status, data, _ = self.call("POST", "/api/v1/scores",
+                                    headers={"Origin": ORIGIN},
+                                    json={"name": "AAA", "score": 100})
+        self.assertEqual((status, data["error"]["code"]), (401, "session_required"))
+
+    def test_scores_post_csrf_required_and_invalid(self):
+        csrf, _ = self.session()
+        self.assertEqual(self.call("POST", "/api/v1/scores",
+                                   headers={"Origin": ORIGIN},
+                                   json={"name": "AAA", "score": 100})[0], 403)
+        self.assertEqual(self.call("POST", "/api/v1/scores",
+                                   headers=self.auth("a" * 64),
+                                   json={"name": "AAA", "score": 100})[0], 403)
+
+    def test_scores_post_origin_rejected(self):
+        csrf, _ = self.session()
+        self.assertEqual(self.call("POST", "/api/v1/scores",
+                                   headers=self.auth(csrf, origin="https://evil.test"),
+                                   json={"name": "AAA", "score": 100})[0], 403)
+
+    def test_scores_post_name_validation(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        for name in ("", "AAAAAAAA", "aaa", "A A", "A!A", "aB3", "12345678"):
+            with self.subTest(name=name):
+                self.assertEqual(self.call("POST", "/api/v1/scores", headers=headers,
+                                           json={"name": name, "score": 100})[0], 422)
+
+    def test_scores_post_score_validation(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        for score in (-1, 2147473648, 1.5, True, False, "100"):
+            with self.subTest(score=score):
+                self.assertEqual(self.call("POST", "/api/v1/scores", headers=headers,
+                                           json={"name": "AAA", "score": score})[0], 422)
+
+    def test_scores_post_unknown_fields_rejected(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        self.assertEqual(self.call("POST", "/api/v1/scores", headers=headers,
+                                   json={"name": "AAA", "score": 100, "extra": 1})[0], 422)
+        self.assertEqual(self.call("POST", "/api/v1/scores", headers=headers,
+                                   json={"name": "AAA"})[0], 422)
+        self.assertEqual(self.call("POST", "/api/v1/scores", headers=headers,
+                                   json={"score": 100})[0], 422)
+        self.assertEqual(self.call("POST", "/api/v1/scores?x=1", headers=headers,
+                                   json={"name": "AAA", "score": 100})[0], 422)
+
+    def test_scores_post_success_and_position(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        status, data, _ = self.call("POST", "/api/v1/scores", headers=headers,
+                                    json={"name": "AAA", "score": 42})
+        self.assertEqual(status, 200)
+        self.assertEqual(data, {"name": "AAA", "score": 42, "position": 1})
+
+    def test_scores_post_position_global_including_gt9(self):
+        app = create_app(dict(self.config, SESSION_SCORE_LIMIT=50))
+        client = app.test_client()
+        csrf, _ = self.session(client)
+        headers = self.auth(csrf)
+        for score in range(100, 1001, 100):
+            status, _, _ = self.call("POST", "/api/v1/scores", client=client,
+                                     headers=headers, json={"name": "AAA", "score": score})
+            self.assertEqual(status, 200)
+        status, data, _ = self.call("GET", "/api/v1/scores", client=client,
+                                    headers={"Origin": ORIGIN})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(data["scores"]), 9)
+        self.assertEqual(data["scores"][0], {"name": "AAA", "score": 1000, "position": 1})
+        self.assertEqual(data["scores"][8], {"name": "AAA", "score": 200, "position": 9})
+
+    def test_scores_post_tie_breaks_by_created_at(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        with patch("server.api.time.time", return_value=2000):
+            self.call("POST", "/api/v1/scores", headers=headers,
+                      json={"name": "AAA", "score": 100})
+        with patch("server.api.time.time", return_value=2001):
+            status, data, _ = self.call("POST", "/api/v1/scores", headers=headers,
+                                        json={"name": "BBB", "score": 100})
+        self.assertEqual(status, 200)
+        self.assertEqual(data["position"], 2)
+        status, data, _ = self.call("GET", "/api/v1/scores", headers={"Origin": ORIGIN})
+        self.assertEqual(status, 200)
+        self.assertEqual(data["scores"][0], {"name": "AAA", "score": 100, "position": 1})
+        self.assertEqual(data["scores"][1], {"name": "BBB", "score": 100, "position": 2})
+
+    def test_scores_get_requires_session(self):
+        status, data, _ = self.call("GET", "/api/v1/scores")
+        self.assertEqual((status, data["error"]["code"]), (401, "session_required"))
+
+    def test_scores_get_does_not_require_csrf(self):
+        self.session()
+        status, data, _ = self.call("GET", "/api/v1/scores", headers={"Origin": ORIGIN})
+        self.assertEqual(status, 200)
+        self.assertEqual(data, {"scores": []})
+
+    def test_scores_get_ordered_and_limited_to_nine(self):
+        app = create_app(dict(self.config, SESSION_SCORE_LIMIT=50))
+        client = app.test_client()
+        csrf, _ = self.session(client)
+        headers = self.auth(csrf)
+        for score in range(100, 1201, 100):
+            self.call("POST", "/api/v1/scores", client=client, headers=headers,
+                      json={"name": "AAA", "score": score})
+        status, data, _ = self.call("GET", "/api/v1/scores", client=client,
+                                    headers={"Origin": ORIGIN})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(data["scores"]), 9)
+        self.assertEqual(data["scores"][0], {"name": "AAA", "score": 1200, "position": 1})
+        self.assertEqual(data["scores"][8], {"name": "AAA", "score": 400, "position": 9})
+
+    def test_scores_post_per_session_rate_limit(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        for i in range(5):
+            status, _, _ = self.call("POST", "/api/v1/scores", headers=headers,
+                                     json={"name": "AAA", "score": 100 + i})
+            self.assertEqual(status, 200)
+        status, data, response_headers = self.call("POST", "/api/v1/scores", headers=headers,
+                                                   json={"name": "AAA", "score": 200})
+        self.assertEqual((status, data["error"]["code"]), (429, "session_score_limited"))
+        self.assertEqual(response_headers["Retry-After"], "60")
+
+    def test_scores_survive_session_expiry(self):
+        csrf, _ = self.session()
+        headers = self.auth(csrf)
+        self.call("POST", "/api/v1/scores", headers=headers,
+                  json={"name": "AAA", "score": 77})
+        future = int(time.time()) + self.app.config["SESSION_TTL"] + 1
+        with patch("server.api.time.time", return_value=future):
+            status, data, _ = self.call("GET", "/api/v1/scores", headers={"Origin": ORIGIN})
+        self.assertEqual((status, data["error"]["code"]), (401, "session_expired"))
+        other = self.app.test_client()
+        csrf2, _ = self.session(other)
+        status, data, _ = self.call("GET", "/api/v1/scores", client=other,
+                                    headers={"Origin": ORIGIN})
+        self.assertEqual(status, 200)
+        self.assertEqual(len(data["scores"]), 1)
+        self.assertEqual(data["scores"][0], {"name": "AAA", "score": 77, "position": 1})
 
     def test_concurrent_create_conflicts(self):
         csrf, _ = self.session()
