@@ -11,7 +11,7 @@
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE, SAVE_PENDING };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE, SAVE_PENDING, RANKING_PENDING, RANKING_NOTICE };
 static enum Phase phase;
 static const char *load_notice;
 static const char *save_notice;
@@ -22,6 +22,13 @@ static Player player;
 static Boss boss;
 static int level, offset, scroll_ticks;
 static const unsigned seeds[MAX_NIVEIS] = {12345, 98765, 42424, 86420};
+
+/* Estado da leitura do ranking (incremento B). */
+static int ranking_ticket;
+static int ranking_count;
+static int ranking_position[WEB_SCORE_MAX];
+static long ranking_score[WEB_SCORE_MAX];
+static char ranking_name[WEB_SCORE_MAX][WEB_SCORE_NAME];
 EM_JS(void, present, (), {
     if (Module["spaceRender"]) Module["spaceRender"]();
 });
@@ -115,6 +122,46 @@ static void handle_save_result(double now)
     web_transition_begin(level, now);
     phase = TRANSITION;
 }
+
+static void handle_ranking_result(void)
+{
+    int kind, outcome, i, ci, count;
+    int pos[WEB_SCORE_MAX];
+    long sc[WEB_SCORE_MAX];
+    char names[WEB_SCORE_MAX * WEB_SCORE_NAME];
+    if (!web_persist_result_ready()) return;
+    if (ranking_ticket <= 0) {
+        web_ranking_error();
+        phase = RANKING_NOTICE;
+        web_reset();
+        return;
+    }
+    /* Leitura dos acessores ANTES do take_result (estado ainda e' RESULT_READY). */
+    count = web_persist_score_count(ranking_ticket);
+    if (count < 0) count = 0;
+    if (count > WEB_SCORE_MAX) count = WEB_SCORE_MAX;
+    for (i = 0; i < count; i++) {
+        pos[i] = web_persist_score_position(ranking_ticket, i);
+        sc[i] = web_persist_score_score(ranking_ticket, i);
+        for (ci = 0; ci < WEB_SCORE_NAME; ci++)
+            names[i * WEB_SCORE_NAME + ci] = (char)web_persist_score_name_char(ranking_ticket, i, ci);
+        names[i * WEB_SCORE_NAME + WEB_SCORE_NAME - 1] = '\0';
+    }
+    /* Consome o resultado (obtem kind/outcome e reinicia o estado). */
+    if (!web_persist_bridge_take_result(&kind, &outcome, NULL, NULL)) {
+        web_ranking_error();
+        phase = RANKING_NOTICE;
+        web_reset();
+        return;
+    }
+    if (kind == 4 && outcome == 1)
+        web_ranking_set(count, pos, sc, names);
+    else
+        web_ranking_error();
+    phase = RANKING_NOTICE;
+    web_reset();
+}
+
 static void new_game(void)
 {
     memset(&player, 0, sizeof player);
@@ -218,6 +265,10 @@ static void render(void)
 {
     if (phase == INTRO || phase == TRANSITION) return; /* Timed sequences own the framebuffer. */
     if (phase == MENU) { web_menu_render(); return; }
+    if (phase == RANKING_PENDING || phase == RANKING_NOTICE) {
+        web_ranking_render();
+        return;
+    }
     if (phase == LOAD_PENDING) {
         web_clear();
         mvprintw(5, 2, "Loading...");
@@ -290,6 +341,19 @@ static void frame(void)
             } else show_load_notice("Unable to start LOAD.");
         }
         else if (action == WEB_MENU_EXIT) { phase = CLOSED; web_reset(); }
+        else if (action == WEB_MENU_HIGHSCORES) {
+            phase = RANKING_PENDING;
+            web_ranking_begin();
+            ranking_ticket = 0;
+            if (web_persist_bridge_available() &&
+                web_persist_begin_score_list() > 0) {
+                ranking_ticket = web_persist_ticket();
+                web_reset();
+            } else {
+                web_ranking_error();
+                phase = RANKING_NOTICE;
+            }
+        }
     } else if (phase == INTRO) {
         if (web_intro_update(now)) new_game();
     } else if (phase == TRANSITION) {
@@ -313,8 +377,22 @@ static void frame(void)
         } else {
             handle_save_result(now);
         }
+    } else if (phase == RANKING_PENDING) {
+        if (web_take_press(6)) {
+            web_ranking_cancel();
+            web_persist_cancel();
+            web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+            show_menu();
+        } else {
+            handle_ranking_result();
+        }
+    } else if (phase == RANKING_NOTICE) {
+        if (enter || web_take_press(6)) {
+            web_ranking_cancel();
+            show_menu();
+        }
     } else if (enter && phase != PLAYING && phase != STAGE_CLEAR &&
-               phase != SAVE_PENDING) {
+               phase != SAVE_PENDING && phase != RANKING_NOTICE) {
         show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;

@@ -3,6 +3,7 @@
 #include "framebuffer.h"
 #include "audio.h"
 #include "space.h"
+#include "persist_bridge.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -11,6 +12,9 @@ static void select_down(int n)
     for (int i = 0; i < n; ++i)
         assert(web_menu_update(0, 1, 0, 0) == WEB_MENU_NONE);
 }
+static void test_ranking_apply_ok(void);
+static void test_ranking_apply_empty(void);
+static void test_ranking_apply_error(void);
 int main(void)
 {
     web_menu_open();
@@ -57,6 +61,81 @@ int main(void)
     web_begin_tick(); assert(web_getch() == -1);
     assert(web_take_press(-1) == 0 && web_take_press(9) == 0);
     web_input(8, 1); web_reset(); assert(web_take_press(8) == 0);
+
+    web_ranking_begin();
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "LOADING..."));
+    assert(strstr((const char *)web_buffer(), "ESC: cancela"));
+
+    int pos[2] = {1, 2};
+    long sc[2] = {1000, 500};
+    char name[2][WEB_SCORE_NAME] = {{'A','B',0}, {'Z',0}};
+    web_ranking_set(2, pos, sc, (const char *)name);
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "GALACTIC RANKING"));
+    assert(strstr((const char *)web_buffer(), "AB"));
+    assert(strstr((const char *)web_buffer(), "NO SCORES YET") == NULL);
+
+    web_ranking_set(0, NULL, NULL, NULL);
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "NO SCORES YET"));
+
+    web_ranking_error();
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "Erro ao carregar ranking."));
+
+    test_ranking_apply_ok();
+    test_ranking_apply_empty();
+    test_ranking_apply_error();
+
     puts("PASS: menu bounds, actions, SOUND toggle/queue clear and UI-only key edges");
     return 0;
+}
+
+static void test_ranking_apply_ok(void)
+{
+    web_persist_bridge_init();
+    int32_t ticket = web_persist_begin_score_list();
+    assert(ticket > 0);
+    assert(web_persist_score_feed_entry(ticket, 0, 1, 1000) == 1);
+    assert(web_persist_score_feed_name_char(ticket, 0, 0, 'A') == 1);
+    assert(web_persist_score_feed_name_char(ticket, 0, 1, 0) == 1);
+    assert(web_persist_score_feed_entry(ticket, 1, 2, 500) == 1);
+    assert(web_persist_score_feed_name_char(ticket, 1, 0, 'Z') == 1);
+    assert(web_persist_score_feed_name_char(ticket, 1, 1, 0) == 1);
+    assert(web_persist_complete(ticket, 1, 0, 0, 0, 0) == 1);
+    web_ranking_apply_bridge_result(ticket, 4, 1);
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "GALACTIC RANKING"));
+    assert(strstr((const char *)web_buffer(), "1. A       : 0001000"));
+    assert(strstr((const char *)web_buffer(), "2. Z       : 0000500"));
+    web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+    web_persist_bridge_cleanup();
+}
+
+static void test_ranking_apply_empty(void)
+{
+    web_persist_bridge_init();
+    int32_t ticket = web_persist_begin_score_list();
+    assert(ticket > 0);
+    assert(web_persist_complete(ticket, 1, 0, 0, 0, 0) == 1);
+    web_ranking_apply_bridge_result(ticket, 4, 1);
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "GALACTIC RANKING"));
+    assert(strstr((const char *)web_buffer(), "NO SCORES YET"));
+    web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+    web_persist_bridge_cleanup();
+}
+
+static void test_ranking_apply_error(void)
+{
+    web_persist_bridge_init();
+    int32_t ticket = web_persist_begin_score_list();
+    assert(ticket > 0);
+    assert(web_persist_complete(ticket, -1, 0, 0, 0, 0) == 1);
+    web_ranking_apply_bridge_result(ticket, 4, -1);
+    web_ranking_render();
+    assert(strstr((const char *)web_buffer(), "Erro ao carregar ranking."));
+    web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+    web_persist_bridge_cleanup();
 }

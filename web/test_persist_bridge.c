@@ -21,6 +21,10 @@ static Player make_player(int vidas, long score)
     return p;
 }
 
+static void test_score_list_feed_and_read(void);
+static void test_score_list_invalid_accessors(void);
+static void test_score_list_cancel(void);
+
 static void test_init_cleanup(void)
 {
     TEST_START();
@@ -563,6 +567,79 @@ int main(void)
     test_bridge_set_available();
     test_bridge_available_survives_cleanup();
     test_bridge_available_survives_init();
+    test_score_list_feed_and_read();
+    test_score_list_invalid_accessors();
+    test_score_list_cancel();
     printf("\nAll %d tests passed.\n", g_test_count);
     return 0;
+}
+
+static void test_score_list_feed_and_read(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    int32_t ticket = web_persist_begin_score_list();
+    assert(ticket > 0);
+    assert(web_persist_kind() == 4);
+    assert(web_persist_ticket() == ticket);
+
+    assert(web_persist_score_feed_entry(ticket, 0, 1, 1000) == 1);
+    assert(web_persist_score_feed_name_char(ticket, 0, 0, 'A') == 1);
+    assert(web_persist_score_feed_name_char(ticket, 0, 1, 'B') == 1);
+    assert(web_persist_score_feed_name_char(ticket, 0, 2, 0) == 1);
+
+    assert(web_persist_score_feed_entry(ticket, 1, 2, 500) == 1);
+    assert(web_persist_score_feed_name_char(ticket, 1, 0, 'Z') == 1);
+    assert(web_persist_score_feed_name_char(ticket, 1, 1, 0) == 1);
+
+    assert(web_persist_score_count(ticket) == 2);
+    assert(web_persist_score_position(ticket, 0) == 1);
+    assert(web_persist_score_score(ticket, 0) == 1000);
+    assert(web_persist_score_name_char(ticket, 0, 0) == 'A');
+    assert(web_persist_score_name_char(ticket, 0, 1) == 'B');
+    assert(web_persist_score_name_char(ticket, 0, 2) == 0);
+    assert(web_persist_score_position(ticket, 1) == 2);
+    assert(web_persist_score_score(ticket, 1) == 500);
+    assert(web_persist_score_name_char(ticket, 1, 0) == 'Z');
+
+    int consumed = web_persist_complete(ticket, 1, 0, 0, 0, 0);
+    assert(consumed == 1);
+    assert(web_persist_result_ready() == 1);
+
+    int kind, outcome;
+    assert(web_persist_bridge_take_result(&kind, &outcome, NULL, NULL) == 1);
+    assert(kind == 4);
+    assert(outcome == 1);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_score_list_invalid_accessors(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    assert(web_persist_score_count(1) == -1);
+    assert(web_persist_score_position(1, 0) == -1);
+    assert(web_persist_score_score(1, 0) == -1);
+    assert(web_persist_score_name_char(1, 0, 0) == -1);
+    assert(web_persist_score_feed_entry(1, 0, 1, 100) == 0);
+    assert(web_persist_score_feed_name_char(1, 0, 0, 'A') == 0);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_score_list_cancel(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    int32_t ticket = web_persist_begin_score_list();
+    assert(ticket > 0);
+    web_persist_cancel();
+    assert(web_persist_result_ready() == 1);
+    int kind, outcome;
+    assert(web_persist_bridge_take_result(&kind, &outcome, NULL, NULL) == 1);
+    assert(kind == 4);
+    assert(outcome == -3);
+    web_persist_bridge_cleanup();
+    TEST_END();
 }

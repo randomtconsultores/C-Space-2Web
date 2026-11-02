@@ -3,12 +3,81 @@
 #include "terminal.h"
 #include "controls.h"
 #include "audio.h"
+#include "persist_bridge.h"
+#include <string.h>
 enum MenuPage { MAIN_PAGE, CONTROLS_PAGE, CAPTURE_PAGE, CREDITS_PAGE, NOTICE_PAGE };
 static enum MenuPage page;
 static int selection, control_selection;
 static const char *control_labels[5] = {
     "MOVE UP", "MOVE DOWN", "MOVE LEFT", "MOVE RIGHT", "FIRE"
 };
+
+/* Estado da pagina HIGH SCORES (leitura do ranking). */
+enum RankState { RANK_IDLE = 0, RANK_LOADING, RANK_OK, RANK_ERROR };
+static enum RankState rank_state;
+static int rank_count;
+static int rank_position[WEB_SCORE_MAX];
+static long rank_score[WEB_SCORE_MAX];
+static char rank_name[WEB_SCORE_MAX][WEB_SCORE_NAME];
+
+void web_ranking_begin(void)
+{
+    rank_state = RANK_LOADING;
+    rank_count = 0;
+}
+
+void web_ranking_set(int count, const int *pos, const long *sc,
+                     const char *name)
+{
+    int i;
+    rank_state = RANK_OK;
+    rank_count = count < 0 ? 0 : (count > WEB_SCORE_MAX ? WEB_SCORE_MAX : count);
+    for (i = 0; i < rank_count; i++) {
+        rank_position[i] = pos[i];
+        rank_score[i] = sc[i];
+        memcpy(rank_name[i], name + i * WEB_SCORE_NAME, WEB_SCORE_NAME);
+    }
+}
+
+void web_ranking_error(void)
+{
+    rank_state = RANK_ERROR;
+    rank_count = 0;
+}
+
+void web_ranking_cancel(void)
+{
+    rank_state = RANK_IDLE;
+    rank_count = 0;
+}
+
+void web_ranking_apply_bridge_result(int ticket, int kind, int outcome)
+{
+    int count, i, ci;
+    int pos[WEB_SCORE_MAX];
+    long sc[WEB_SCORE_MAX];
+    char names[WEB_SCORE_MAX * WEB_SCORE_NAME];
+    if (kind != 4 || outcome != 1) {
+        web_ranking_error();
+        return;
+    }
+    count = web_persist_score_count(ticket);
+    if (count < 0) {
+        web_ranking_error();
+        return;
+    }
+    if (count > WEB_SCORE_MAX) count = WEB_SCORE_MAX;
+    for (i = 0; i < count; i++) {
+        pos[i] = web_persist_score_position(ticket, i);
+        sc[i] = web_persist_score_score(ticket, i);
+        for (ci = 0; ci < WEB_SCORE_NAME; ci++)
+            names[i * WEB_SCORE_NAME + ci] =
+                (char)web_persist_score_name_char(ticket, i, ci);
+        names[i * WEB_SCORE_NAME + WEB_SCORE_NAME - 1] = '\0';
+    }
+    web_ranking_set(count, pos, sc, names);
+}
+
 void web_menu_open(void)
 {
     page = MAIN_PAGE;
@@ -48,6 +117,7 @@ enum WebMenuAction web_menu_update(int up, int down, int enter, int back)
     case OPCAO_PLAY: return WEB_MENU_PLAY;
     case OPCAO_LOAD: return WEB_MENU_LOAD;
     case OPCAO_SAIR: return WEB_MENU_EXIT;
+    case OPCAO_MAX_SCORES: return WEB_MENU_HIGHSCORES;
     case OPCAO_COMANDOS: page = CONTROLS_PAGE; control_selection = 0; break;
     case OPCAO_CREDITOS: page = CREDITS_PAGE; break;
     default: page = NOTICE_PAGE; break;
@@ -64,6 +134,39 @@ int web_sound_enabled(void)
 {
     return som_ativo != 0;
 }
+void web_ranking_render(void)
+{
+    web_clear();
+    const int cx = LARGURA_TELA / 2, cy = ALTURA_TELA / 2;
+    int i;
+    if (rank_state == RANK_LOADING) {
+        mvprintw(cy - 2, cx - 7, "LOADING...");
+        mvprintw(cy, cx - 10, "ESC: cancela");
+        return;
+    }
+    if (rank_state == RANK_ERROR) {
+        mvprintw(cy - 2, cx - 12, "Erro ao carregar ranking.");
+        mvprintw(cy, cx - 12, "ENTER / ESC: menu");
+        return;
+    }
+    if (rank_state == RANK_OK) {
+        mvprintw(cy - 6, cx - 10, "GALACTIC RANKING");
+        mvprintw(cy - 5, cx - 10, "==================");
+        if (rank_count == 0) {
+            mvprintw(cy - 2, cx - 9, "NO SCORES YET");
+        } else {
+            for (i = 0; i < rank_count; i++) {
+                mvprintw(cy - 4 + i, cx - 12, "%d. %-7s : %07ld",
+                         rank_position[i], rank_name[i], rank_score[i]);
+            }
+        }
+        mvprintw(cy + rank_count + 1, cx - 12, "ENTER / ESC: menu");
+        return;
+    }
+    mvprintw(cy - 2, cx - 9, "NO SCORES YET");
+    mvprintw(cy, cx - 10, "ENTER / ESC: menu");
+}
+
 void web_menu_render(void)
 {
     web_clear();

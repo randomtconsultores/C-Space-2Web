@@ -37,6 +37,8 @@ function createMockClient(behavior = {}) {
     let saveResult = behavior.saveResult ?? { format_version: 1, level_index: 0, lives: 3, score: 1000, revision: 1, updated_at: 123 };
     const loads = [];
     const saves = [];
+    const scores = [];
+    let scoresResolver;
 
     const client = {
         load: () => {
@@ -53,6 +55,13 @@ function createMockClient(behavior = {}) {
             });
             return p;
         },
+        scores: () => {
+            const p = new Promise((resolve, reject) => {
+                scoresResolver = { resolve, reject };
+                scores.push({ resolve, reject });
+            });
+            return p;
+        },
         cancel: () => {
             if (loadResolver) loadResolver.reject(new Error("cancelled"));
             if (saveResolver) saveResolver.reject(new Error("cancelled"));
@@ -62,9 +71,12 @@ function createMockClient(behavior = {}) {
         _rejectLoad: (err) => { if (loadResolver) loadResolver.reject(err); },
         _resolveSave: (value) => { if (saveResolver) saveResolver.resolve(value); },
         _rejectSave: (err) => { if (saveResolver) saveResolver.reject(err); },
+        _resolveScores: (v) => { if (scoresResolver) scoresResolver.resolve(v); },
+        _rejectScores: (e) => { if (scoresResolver) scoresResolver.reject(e); },
         _setRevision: (r) => { revision = r; },
         _loads: () => loads,
         _saves: () => saves,
+        _scores: () => scores,
         // Expor resultados para os testes
         loadResult,
         saveResult
@@ -610,6 +622,72 @@ test("init returns false when SpacePersistence.createClient is missing", () => {
     globalThis.SpacePersistence = {};
     assert.equal(Bridge.init(Module), false);
     delete globalThis.SpacePersistence;
+});
+
+test("SCORE LIST ok: feeds entries and completes with 1", async () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient();
+    Bridge.init(Module, { client });
+
+    Module._setKind(4);
+    Module._setTicket(7);
+    Bridge.poll();
+    await tick();
+
+    client._resolveScores([
+        { name: "AAA", score: 1000, position: 1 },
+        { name: "ZZZ", score: 500, position: 2 }
+    ]);
+    await tick();
+
+    const calls = Module._completeCalls();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ticket, 7);
+    assert.equal(calls[0].outcome, 1);
+    assert.equal(client._scores().length, 1);
+});
+
+test("SCORE LIST error maps to -1", async () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient();
+    Bridge.init(Module, { client });
+
+    Module._setKind(4);
+    Module._setTicket(3);
+    Bridge.poll();
+    await tick();
+
+    client._rejectScores({ code: "network_error" });
+    await tick();
+
+    const calls = Module._completeCalls();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].outcome, -1);
+});
+
+test("SCORE LIST late response against new ticket is ignored", async () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient();
+    Bridge.init(Module, { client });
+
+    Module._setKind(4);
+    Module._setTicket(11);
+    Bridge.poll();
+    await tick();
+
+    Module._setKind(4);
+    Module._setTicket(22);
+    Bridge.poll();
+    await tick();
+
+    client._scores()[0].resolve([{ name: "AAA", score: 1000, position: 1 }]);
+    await tick();
+
+    const calls = Module._completeCalls();
+    assert.equal(calls.length, 0);
 });
 
 test("init tolerates client exceptions", () => {

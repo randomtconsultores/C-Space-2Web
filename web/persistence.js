@@ -191,6 +191,17 @@
                 if (active) stop(active, "cancelled");
                 else { csrf = null; revision = null; ++epoch; }
             },
+            scores: () => run(async ctx => {
+                await session(ctx);
+                const value = await request(ctx, "/api/v1/scores", "GET", undefined, false, [200]);
+                if (!record(value, ["scores"]) || !Array.isArray(value.scores))
+                    throw fault("invalid_response", ctx);
+                return Object.freeze(value.scores.map(entry => {
+                    if (!record(entry, ["name", "score", "position"]))
+                        throw fault("invalid_response", ctx);
+                    return Object.freeze({name: entry.name, score: entry.score, position: entry.position});
+                }));
+            }),
             getState: () => Object.freeze({busy: active !== null, revision, epoch})
         });
     }

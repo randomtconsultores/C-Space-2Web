@@ -3,10 +3,14 @@
 #include <stdint.h>
 #include <string.h>
 
+#define WEB_SCORE_MAX 9
+#define WEB_SCORE_NAME 8
+
 typedef enum {
     PB_IDLE = 0,
     PB_LOAD_PENDING,
     PB_SAVE_PENDING,
+    PB_SCORE_PENDING,
     PB_RESULT_READY
 } PersistBridgeState;
 
@@ -19,6 +23,12 @@ static Player s_restored_player;
 static int s_restored_level;
 static int32_t s_ticket_counter = 0;
 static int s_bridge_available = 0;
+
+/* Ranking recebido (kind 4). */
+static int s_score_count = 0;
+static int s_score_position[WEB_SCORE_MAX];
+static long s_score_value[WEB_SCORE_MAX];
+static char s_score_name[WEB_SCORE_MAX][WEB_SCORE_NAME];
 
 static int32_t next_ticket(void)
 {
@@ -36,6 +46,10 @@ void web_persist_bridge_init(void)
     memset(&s_snapshot, 0, sizeof(s_snapshot));
     memset(&s_restored_player, 0, sizeof(s_restored_player));
     s_restored_level = 0;
+    memset(s_score_position, 0, sizeof(s_score_position));
+    memset(s_score_value, 0, sizeof(s_score_value));
+    memset(s_score_name, 0, sizeof(s_score_name));
+    s_score_count = 0;
 }
 
 void web_persist_bridge_cleanup(void)
@@ -49,6 +63,10 @@ void web_persist_bridge_cleanup(void)
     memset(&s_snapshot, 0, sizeof(s_snapshot));
     memset(&s_restored_player, 0, sizeof(s_restored_player));
     s_restored_level = 0;
+    memset(s_score_position, 0, sizeof(s_score_position));
+    memset(s_score_value, 0, sizeof(s_score_value));
+    memset(s_score_name, 0, sizeof(s_score_name));
+    s_score_count = 0;
 }
 
 void web_persist_bridge_set_available(int available)
@@ -65,13 +83,89 @@ int32_t web_persist_kind(void)
 {
     if (s_state == PB_LOAD_PENDING) return 1;
     if (s_state == PB_SAVE_PENDING) return 2;
+    if (s_state == PB_SCORE_PENDING) return 4;
     return 0;
 }
 
 int32_t web_persist_ticket(void)
 {
-    if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING) return s_ticket;
+    if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING ||
+        s_state == PB_SCORE_PENDING) return s_ticket;
     return 0;
+}
+
+int web_persist_result_ready(void)
+{
+    return s_state == PB_RESULT_READY ? 1 : 0;
+}
+
+static int score_ticket_ok(int32_t ticket)
+{
+    return ticket > 0 && ticket == s_ticket && s_kind == 4 &&
+           (s_state == PB_SCORE_PENDING || s_state == PB_RESULT_READY);
+}
+
+int32_t web_persist_score_count(int32_t ticket)
+{
+    if (!score_ticket_ok(ticket)) return -1;
+    return s_score_count;
+}
+
+int32_t web_persist_score_position(int32_t ticket, int32_t index)
+{
+    if (!score_ticket_ok(ticket)) return -1;
+    if (index < 0 || index >= s_score_count) return -1;
+    return s_score_position[index];
+}
+
+int32_t web_persist_score_score(int32_t ticket, int32_t index)
+{
+    if (!score_ticket_ok(ticket)) return -1;
+    if (index < 0 || index >= s_score_count) return -1;
+    {
+        long v = s_score_value[index];
+        if (v < 0 || v > 2147473647L) return -1;
+        return (int32_t)v;
+    }
+}
+
+int32_t web_persist_score_name_char(int32_t ticket, int32_t index,
+                                    int32_t char_index)
+{
+    if (!score_ticket_ok(ticket)) return -1;
+    if (index < 0 || index >= s_score_count) return -1;
+    if (char_index < 0 || char_index >= WEB_SCORE_NAME) return -1;
+    return (int32_t)(unsigned char)s_score_name[index][char_index];
+}
+
+int32_t web_persist_score_feed_entry(int32_t ticket, int32_t index,
+                                     int32_t position, int32_t score)
+{
+    if (ticket <= 0 || ticket != s_ticket || s_kind != 4 ||
+        s_state != PB_SCORE_PENDING) return 0;
+    if (index < 0 || index >= WEB_SCORE_MAX) return 0;
+    if (position < 1) return 0;
+    if (score < 0 || score > 2147473647) return 0;
+    s_score_position[index] = (int)position;
+    s_score_value[index] = (long)score;
+    s_score_name[index][0] = '\0';
+    if (index + 1 > s_score_count) s_score_count = index + 1;
+    return 1;
+}
+
+int32_t web_persist_score_feed_name_char(int32_t ticket, int32_t index,
+                                         int32_t char_index, int32_t char_code)
+{
+    if (ticket <= 0 || ticket != s_ticket || s_kind != 4 ||
+        s_state != PB_SCORE_PENDING) return 0;
+    if (index < 0 || index >= WEB_SCORE_MAX) return 0;
+    if (char_index < 0 || char_index >= WEB_SCORE_NAME) return 0;
+    if (char_code < 0 || char_code > 255) return 0;
+    s_score_name[index][char_index] = (char)(unsigned char)char_code;
+    if (char_index + 1 > s_score_count && char_index < WEB_SCORE_NAME - 1) {
+        /* keep count consistent with fed entries; name termination handled by caller */
+    }
+    return 1;
 }
 
 int32_t web_persist_field(int32_t ticket, int32_t field)
@@ -109,7 +203,8 @@ int32_t web_persist_complete(int32_t ticket, int32_t outcome,
                              int32_t lives, int32_t score)
 {
     if (ticket != s_ticket || ticket <= 0) return 0;
-    if (s_state != PB_LOAD_PENDING && s_state != PB_SAVE_PENDING) return 0;
+    if (s_state != PB_LOAD_PENDING && s_state != PB_SAVE_PENDING &&
+        s_state != PB_SCORE_PENDING) return 0;
 
     if (s_kind == 1) { /* LOAD */
         if (!validate_load_outcome(outcome)) outcome = -1;
@@ -158,13 +253,19 @@ int32_t web_persist_complete(int32_t ticket, int32_t outcome,
         }
         s_state = PB_RESULT_READY;
         return 1;
+    } else if (s_kind == 4) { /* SCORE_LIST */
+        if (outcome != 1 && outcome != 0 && outcome > -1) outcome = -1;
+        s_outcome = outcome;
+        s_state = PB_RESULT_READY;
+        return 1;
     }
     return 0;
 }
 
 void web_persist_cancel(void)
 {
-    if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING) {
+    if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING ||
+        s_state == PB_SCORE_PENDING) {
         s_outcome = -3;
         s_state = PB_RESULT_READY;
     }
@@ -194,6 +295,19 @@ int32_t web_persist_begin_save(const Player *player, int next_level)
     s_ticket = ticket;
     s_kind = 2;
     s_outcome = 0;
+    return ticket;
+}
+
+int32_t web_persist_begin_score_list(void)
+{
+    if (s_state != PB_IDLE) return 0;
+    int32_t ticket = next_ticket();
+    if (ticket <= 0) return 0;
+    s_state = PB_SCORE_PENDING;
+    s_ticket = ticket;
+    s_kind = 4;
+    s_outcome = 0;
+    s_score_count = 0;
     return ticket;
 }
 

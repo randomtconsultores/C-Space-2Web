@@ -4,6 +4,9 @@
 #include "space.h"
 #include <stdint.h>
 
+#define WEB_SCORE_MAX 9
+#define WEB_SCORE_NAME 8
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -62,9 +65,32 @@ int32_t web_persist_begin_load(void);
    Retorna ticket (>0) ou 0 se falha/já ocupado/snapshot inválido. */
 int32_t web_persist_begin_save(const Player *player, int next_level);
 
+/* ===== Leitura do ranking (kind 4) ===== */
+
+/* Inicia pedido de leitura do ranking. Retorna ticket (>0) ou 0 se falha/já ocupado. */
+int32_t web_persist_begin_score_list(void);
+
+/* Devolve 1 se há resultado pronto a ser consumido (estado PB_RESULT_READY). */
+int web_persist_result_ready(void);
+
+/* Acessores ao ranking recebido (kind 4). Validos enquanto o pedido esta
+   pendente ou o resultado pronto. Retornam -1 se ticket/index invalido. */
+int32_t web_persist_score_count(int32_t ticket);
+int32_t web_persist_score_position(int32_t ticket, int32_t index);
+int32_t web_persist_score_score(int32_t ticket, int32_t index);
+int32_t web_persist_score_name_char(int32_t ticket, int32_t index,
+                                    int32_t char_index);
+
+/* Alimentacao do ranking pelo JS (kind 4). Retorna 1 se aceito, 0 se invalido. */
+int32_t web_persist_score_feed_entry(int32_t ticket, int32_t index,
+                                     int32_t position, int32_t score);
+int32_t web_persist_score_feed_name_char(int32_t ticket, int32_t index,
+                                         int32_t char_index, int32_t char_code);
+
 /* ===== API para main.c obter resultado uma única vez ===== */
-/* kind: 1=LOAD, 2=SAVE. Preenche *out_player e *out_level apenas se outcome==1.
-   Retorna 1 se havia resultado pronto e foi consumido, 0 caso contrário. */
+/* kind: 1=LOAD, 2=SAVE, 4=SCORE_LIST. Preenche *out_player e *out_level apenas
+   se outcome==1 e kind==1. Retorna 1 se havia resultado pronto e foi consumido,
+   0 caso contrario. */
 int web_persist_bridge_take_result(int *out_kind, int *out_outcome,
                                    Player *out_player, int *out_level);
 

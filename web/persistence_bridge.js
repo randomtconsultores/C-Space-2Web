@@ -169,6 +169,39 @@
         }
     }
 
+    function startScoreList(ticket) {
+        if (!client) return;
+        operationPromise = Promise.resolve().then(() => {
+            if (activeTicket !== ticket || activeKind !== 4) return;
+            return safeCall(() => client.scores());
+        })
+        .then(entries => {
+            if (activeTicket !== ticket || activeKind !== 4) return;
+            let i = 0;
+            for (const entry of entries) {
+                if (activeTicket !== ticket || activeKind !== 4) return;
+                safeCall(() => moduleInstance._web_persist_score_feed_entry(
+                    ticket, i, entry.position, entry.score));
+                const name = String(entry.name);
+                for (let ci = 0; ci < 7; ci++) {
+                    safeCall(() => moduleInstance._web_persist_score_feed_name_char(
+                        ticket, i, ci, ci < name.length ? name.charCodeAt(ci) : 0));
+                }
+                i++;
+            }
+            complete(ticket, 1, 0, 0, 0, 0);
+        })
+        .catch(err => {
+            if (activeTicket !== ticket || activeKind !== 4) return;
+            const outcome = mapErrorToOutcome(err);
+            if (outcome === -3 && (activeKind !== 4 || activeTicket !== ticket)) return;
+            complete(ticket, outcome, 0, 0, 0, 0);
+        })
+        .finally(() => {
+            if (activeTicket === ticket && activeKind === 4) resetOperation();
+        });
+    }
+
     const SpacePersistenceBridge = Object.freeze({
         init(Module, options) {
             if (initialized) return false; // rejeita segundo init
@@ -229,6 +262,8 @@
                     startLoad(ticket);
                 } else if (kind === 2) {
                     startSave(ticket);
+                } else if (kind === 4) {
+                    startScoreList(ticket);
                 }
             });
         },
