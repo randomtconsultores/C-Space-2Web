@@ -11,9 +11,11 @@
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE, SAVE_PENDING };
 static enum Phase phase;
 static const char *load_notice;
+static const char *save_notice;
+static int save_notice_ttl;
 static char mapa[ALTURA_TELA][LARGURA_MAPA];
 static Projétil enemy_shots[MAX_TIROS_INIMIGO];
 static Player player;
@@ -72,6 +74,12 @@ static void show_load_notice(const char *message)
     phase = LOAD_NOTICE;
     web_reset();
 }
+static void show_save_notice(const char *message)
+{
+    save_notice = message;
+    save_notice_ttl = 120;
+    web_reset();
+}
 static void handle_load_result(void)
 {
     int kind, outcome, restored_level;
@@ -96,6 +104,16 @@ static void handle_load_result(void)
     case -4: show_load_notice("Checkpoint level unavailable."); break;
     default: show_load_notice("Unable to load checkpoint."); break;
     }
+}
+static void handle_save_result(double now)
+{
+    int kind, outcome;
+    if (!web_persist_bridge_take_result(&kind, &outcome, NULL, NULL)) return;
+    if (kind != 2 || outcome != 1) {
+        show_save_notice("Save not confirmed.");
+    }
+    web_transition_begin(level, now);
+    phase = TRANSITION;
 }
 static void new_game(void)
 {
@@ -206,6 +224,12 @@ static void render(void)
         mvprintw(7, 2, "ESC: cancel");
         return;
     }
+    if (phase == SAVE_PENDING) {
+        web_clear();
+        mvprintw(5, 2, "Saving...");
+        mvprintw(7, 2, "ESC: cancel");
+        return;
+    }
     if (phase == LOAD_NOTICE) {
         web_clear();
         mvprintw(5, 2, "%s", load_notice ? load_notice : "Unable to load checkpoint.");
@@ -223,6 +247,10 @@ static void render(void)
         mvprintw(5, 2, "LEVEL %d: CONFIGURATION MISSING", level + 1);
         mvprintw(7, 2, "Inherited issue; not a victory.");
         mvprintw(9, 2, "ENTER: MAIN MENU");
+        if (save_notice_ttl > 0) {
+            mvprintw(11, 2, "%s", save_notice ? save_notice : "Save not confirmed.");
+            --save_notice_ttl;
+        }
         return;
     }
     if (phase == VICTORY) {
@@ -231,6 +259,10 @@ static void render(void)
         return;
     }
     draw_game(&player, mapa, offset, level, &boss, enemy_shots);
+    if (save_notice_ttl > 0) {
+        mvprintw(5, 2, "%s", save_notice ? save_notice : "Save not confirmed.");
+        --save_notice_ttl;
+    }
     if (phase == GAME_OVER) {
         mvprintw(6, 4, "YOU WERE CRUSHED!");
         mvprintw(7, 4, "FINAL SCORE: %ld", player.pontuacao);
@@ -241,7 +273,7 @@ static void frame(void)
 {
     double now = emscripten_get_now();
     int enter = web_enter_pressed();
-    int loading_frame = phase == LOAD_PENDING;
+    int loading_frame = phase == LOAD_PENDING || phase == SAVE_PENDING;
     if (phase == MENU) {
         int up = web_take_press(0) | web_take_press(7);
         int down = web_take_press(1) | web_take_press(8);
@@ -252,7 +284,7 @@ static void frame(void)
             phase = INTRO;
         }
         else if (action == WEB_MENU_LOAD) {
-            if (web_persist_begin_load() > 0) {
+            if (web_persist_bridge_available() && web_persist_begin_load() > 0) {
                 phase = LOAD_PENDING;
                 web_reset();
             } else show_load_notice("Unable to start LOAD.");
@@ -271,7 +303,18 @@ static void frame(void)
         } else handle_load_result();
     } else if (phase == LOAD_NOTICE) {
         if (enter || web_take_press(6)) show_menu();
-    } else if (enter && phase != PLAYING && phase != STAGE_CLEAR) {
+    } else if (phase == SAVE_PENDING) {
+        if (web_take_press(6)) {
+            web_persist_cancel();
+            web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+            show_save_notice("Save not confirmed.");
+            web_transition_begin(level, now);
+            phase = TRANSITION;
+        } else {
+            handle_save_result(now);
+        }
+    } else if (enter && phase != PLAYING && phase != STAGE_CLEAR &&
+               phase != SAVE_PENDING) {
         show_menu();
     }
     double step = (DELAY - level * 3000) / 1000.0;
@@ -281,8 +324,18 @@ static void frame(void)
     if (phase == STAGE_CLEAR) {
         web_reset();
         if (level < MAX_NIVEIS - 1) {
-            web_transition_begin(level, now);
-            phase = TRANSITION;
+            int next_level = level + 1;
+            int config_ok = configuracao_niveis[next_level].comprimento_mapa >= LARGURA_TELA &&
+                            configuracao_niveis[next_level].comprimento_mapa <= LARGURA_MAPA;
+            if (config_ok && web_persist_bridge_available() &&
+                web_persist_begin_save(&player, next_level) > 0) {
+                phase = SAVE_PENDING;
+                web_reset();
+            } else {
+                show_save_notice("Save not confirmed.");
+                web_transition_begin(level, now);
+                phase = TRANSITION;
+            }
         } else advance_level();
     }
     render();

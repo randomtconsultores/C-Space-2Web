@@ -18,6 +18,7 @@ static WebCheckpoint s_snapshot;
 static Player s_restored_player;
 static int s_restored_level;
 static int32_t s_ticket_counter = 0;
+static int s_bridge_available = 0;
 
 static int32_t next_ticket(void)
 {
@@ -44,9 +45,20 @@ void web_persist_bridge_cleanup(void)
     s_kind = 0;
     s_outcome = 0;
     /* s_ticket_counter NÃO é reposto */
+    /* s_bridge_available NÃO é reposto: sobrevive a init/cleanup */
     memset(&s_snapshot, 0, sizeof(s_snapshot));
     memset(&s_restored_player, 0, sizeof(s_restored_player));
     s_restored_level = 0;
+}
+
+void web_persist_bridge_set_available(int available)
+{
+    s_bridge_available = available ? 1 : 0;
+}
+
+int web_persist_bridge_available(void)
+{
+    return s_bridge_available;
 }
 
 int32_t web_persist_kind(void)

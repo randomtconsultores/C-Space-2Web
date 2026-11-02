@@ -585,3 +585,42 @@ test("outcome is always integer number", async () => {
     assert.equal(typeof calls[0].outcome, "number");
     assert.equal(Number.isInteger(calls[0].outcome), true);
 });
+
+test("init returns false with null Module", () => {
+    const Bridge = freshBridge();
+    assert.equal(Bridge.init(null), false);
+});
+
+test("init returns false with Module missing _web_persist_kind", () => {
+    const Bridge = freshBridge();
+    const Module = { _web_persist_ticket: () => 0 };
+    assert.equal(Bridge.init(Module), false);
+});
+
+test("init returns true with injected client", () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient();
+    assert.equal(Bridge.init(Module, { client }), true);
+});
+
+test("init returns false when SpacePersistence.createClient is missing", () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    globalThis.SpacePersistence = {};
+    assert.equal(Bridge.init(Module), false);
+    delete globalThis.SpacePersistence;
+});
+
+test("init tolerates client exceptions", () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const throwingClient = {
+        load: () => { throw new Error("boom"); },
+        cancel: () => { throw new Error("boom2"); },
+        getState: () => { throw new Error("boom3"); }
+    };
+    assert.equal(Bridge.init(Module, { client: throwingClient }), true);
+    assert.doesNotThrow(() => Bridge.poll());
+    assert.doesNotThrow(() => Bridge.cancel());
+});

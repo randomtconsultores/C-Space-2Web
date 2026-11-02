@@ -11,8 +11,15 @@ extern "C" {
 /* Inicializa o módulo da ponte. Deve ser chamado uma vez no arranque. */
 void web_persist_bridge_init(void);
 
-/* Limpa estado interno (exceto contador de tickets). Chamado no encerramento. */
+/* Limpa estado interno (exceto contador de tickets e disponibilidade). Chamado no encerramento. */
 void web_persist_bridge_cleanup(void);
+
+/* Notifica a disponibilidade da ponte JS→C. 1 = disponível, 0 = indisponível.
+   Sobrevive a init()/cleanup(). Chamado por JS após init(Module). */
+void web_persist_bridge_set_available(int available);
+
+/* Devolve 1 se a ponte JS está disponível, 0 caso contrário. */
+int web_persist_bridge_available(void);
 
 /* ===== 5 wrappers escalares (fronteira JS/Wasm) ===== */
 

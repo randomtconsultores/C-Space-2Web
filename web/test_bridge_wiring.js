@@ -68,6 +68,7 @@ function addCExports(Module) {
     Module._web_capture_key = () => {};
     Module._web_input = () => {};
     Module._web_reset = () => {};
+    Module._web_persist_bridge_set_available = (v) => { Module._persist_available = v; };
     Module.HEAPU8 = new Uint8Array([0, 65, 66, 10, 67, 68, 10]);
 }
 
@@ -167,4 +168,31 @@ test("framebuffer failure still lets poll run and is reported separately", () =>
     assert.equal(calls.poll, 1);
     assert.match(elements.get("status").textContent, /Falha na apresenta/);
     assert.equal(Module.spaceRender, null);
+});
+
+test("onRuntimeInitialized sets bridge available=0 when SpacePersistenceBridge absent", () => {
+    const { Module } = load(undefined);
+    Module.onRuntimeInitialized();
+    assert.equal(Module._persist_available, 0);
+});
+
+test("onRuntimeInitialized sets bridge available=1 when init returns true", () => {
+    const { bridge } = makeBridge({ init() { return true; } });
+    const { Module } = load(bridge);
+    Module.onRuntimeInitialized();
+    assert.equal(Module._persist_available, 1);
+});
+
+test("onRuntimeInitialized sets bridge available=0 when init returns false", () => {
+    const { bridge } = makeBridge({ init() { return false; } });
+    const { Module } = load(bridge);
+    Module.onRuntimeInitialized();
+    assert.equal(Module._persist_available, 0);
+});
+
+test("onRuntimeInitialized sets bridge available=0 when init throws", () => {
+    const { bridge } = makeBridge({ init() { throw new Error("init boom"); } });
+    const { Module } = load(bridge);
+    assert.doesNotThrow(() => Module.onRuntimeInitialized());
+    assert.equal(Module._persist_available, 0);
 });

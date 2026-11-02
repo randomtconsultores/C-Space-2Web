@@ -17,7 +17,7 @@ check-toolchain:
 	@command -v $(EMCC) >/dev/null 2>&1 || { echo "emcc not found; activate Emscripten before building."; exit 1; }
 $(OUT)/space.js $(OUT)/space.wasm &: $(SOURCES) $(HEADERS) web/Makefile
 	mkdir -p $(OUT)
-	$(EMCC) -std=gnu11 -Wall -Wextra -O0 -g -DSPACE_WEB -I. -include web/platform.h $(SOURCES) -lm -sASSERTIONS=1 -sENVIRONMENT=web -sFILESYSTEM=0 -sEXPORTED_RUNTIME_METHODS='["HEAPU8"]' -sEXPORTED_FUNCTIONS='["_main","_web_buffer","_web_buffer_size","_web_width","_web_height","_web_input","_web_reset","_web_control_key","_web_capture_active","_web_capture_key","_web_audio_take","_web_audio_clear","_web_sound_enabled","_web_set_sound","_web_menu_active","_web_persist_kind","_web_persist_ticket","_web_persist_field","_web_persist_complete","_web_persist_cancel"]' -o $(OUT)/space.js
+	$(EMCC) -std=gnu11 -Wall -Wextra -O0 -g -DSPACE_WEB -I. -include web/platform.h $(SOURCES) -lm -sASSERTIONS=1 -sENVIRONMENT=web -sFILESYSTEM=0 -sEXPORTED_RUNTIME_METHODS='["HEAPU8"]' -sEXPORTED_FUNCTIONS='["_main","_web_buffer","_web_buffer_size","_web_width","_web_height","_web_input","_web_reset","_web_control_key","_web_capture_active","_web_capture_key","_web_audio_take","_web_audio_clear","_web_sound_enabled","_web_set_sound","_web_menu_active","_web_persist_kind","_web_persist_ticket","_web_persist_field","_web_persist_complete","_web_persist_cancel","_web_persist_bridge_set_available"]' -o $(OUT)/space.js
 $(OUT)/index.html: web/index.html
 	mkdir -p $(OUT)
 	cp $< $@

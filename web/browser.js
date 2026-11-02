@@ -369,9 +369,13 @@ var Module = {
             else handlePageFocus();
         });
         statusNode.textContent = "Menu: W/S ou setas, Enter seleciona, Esc recua/cancela. Som em Controls. N: arena do boss; Q: dano.";
+        var bridgeAvailable = 0;
         if (typeof SpacePersistenceBridge !== "undefined") {
-            try { SpacePersistenceBridge.init(Module); }
+            try { bridgeAvailable = SpacePersistenceBridge.init(Module) === true ? 1 : 0; }
             catch (_e) { console.error("SpacePersistenceBridge init failed"); }
+        }
+        if (typeof Module._web_persist_bridge_set_available === "function") {
+            Module._web_persist_bridge_set_available(bridgeAvailable);
         }
     }
 };

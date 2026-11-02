@@ -223,6 +223,28 @@ static void test_save_cancelled(void)
     TEST_END();
 }
 
+static void test_save_cancel_allows_next_operation(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    Player p = make_player(3, 5000);
+    int32_t ticket = web_persist_begin_save(&p, 1);
+    assert(web_persist_kind() == 2);
+    web_persist_cancel();
+    /* Após cancel + consume, a ponte volta a IDLE: nova operação é possível. */
+    assert(web_persist_kind() == 0);
+    assert(web_persist_ticket() == 0);
+    int kind, outcome; Player p2; int level;
+    assert(web_persist_bridge_take_result(&kind, &outcome, &p2, &level) == 1);
+    assert(outcome == -3);
+    int32_t ticket2 = web_persist_begin_save(&p, 2);
+    assert(ticket2 > 0);
+    assert(ticket2 != ticket);
+    assert(web_persist_kind() == 2);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
 static void test_two_loads_sequential(void)
 {
     TEST_START();
@@ -467,6 +489,49 @@ static void test_take_result_only_fills_on_load_ok(void)
     TEST_END();
 }
 
+static void test_bridge_available_default(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    assert(web_persist_bridge_available() == 0);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_bridge_set_available(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_bridge_set_available(1);
+    assert(web_persist_bridge_available() == 1);
+    web_persist_bridge_set_available(0);
+    assert(web_persist_bridge_available() == 0);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_bridge_available_survives_cleanup(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_bridge_set_available(1);
+    web_persist_bridge_cleanup();
+    assert(web_persist_bridge_available() == 1);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_bridge_available_survives_init(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_bridge_set_available(1);
+    web_persist_bridge_init();
+    assert(web_persist_bridge_available() == 1);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
 int main(void)
 {
     test_init_cleanup();
@@ -481,6 +546,7 @@ int main(void)
     test_save_echo_mismatch();
     test_save_error();
     test_save_cancelled();
+    test_save_cancel_allows_next_operation();
     test_two_loads_sequential();
     test_load_then_save();
     test_save_then_load();
@@ -493,6 +559,10 @@ int main(void)
     test_state_preserved_on_failure();
     test_concurrent_load_save_blocked();
     test_take_result_only_fills_on_load_ok();
+    test_bridge_available_default();
+    test_bridge_set_available();
+    test_bridge_available_survives_cleanup();
+    test_bridge_available_survives_init();
     printf("\nAll %d tests passed.\n", g_test_count);
     return 0;
 }
