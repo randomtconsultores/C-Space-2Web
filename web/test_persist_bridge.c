@@ -24,6 +24,10 @@ static Player make_player(int vidas, long score)
 static void test_score_list_feed_and_read(void);
 static void test_score_list_invalid_accessors(void);
 static void test_score_list_cancel(void);
+static void test_name_feed_chars_and_backspace(void);
+static void test_name_feed_enter_and_esc(void);
+static void test_name_feed_charset_and_limit(void);
+static void test_begin_score_and_accessors(void);
 
 static void test_init_cleanup(void)
 {
@@ -570,6 +574,10 @@ int main(void)
     test_score_list_feed_and_read();
     test_score_list_invalid_accessors();
     test_score_list_cancel();
+    test_name_feed_chars_and_backspace();
+    test_name_feed_enter_and_esc();
+    test_name_feed_charset_and_limit();
+    test_begin_score_and_accessors();
     printf("\nAll %d tests passed.\n", g_test_count);
     return 0;
 }
@@ -640,6 +648,115 @@ static void test_score_list_cancel(void)
     assert(web_persist_bridge_take_result(&kind, &outcome, NULL, NULL) == 1);
     assert(kind == 4);
     assert(outcome == -3);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_name_feed_chars_and_backspace(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_name_start();
+    assert(web_persist_name_active() == 1);
+    assert(web_persist_name_feed('A') == 1);
+    assert(web_persist_name_feed('b') == 1); /* minuscula -> maiuscula */
+    assert(web_persist_name_length() == 2);
+    assert(web_persist_name_char(0) == 'A');
+    assert(web_persist_name_char(1) == 'B');
+    assert(web_persist_name_feed(8) == 1); /* backspace */
+    assert(web_persist_name_length() == 1);
+    assert(web_persist_name_char(0) == 'A');
+    web_persist_name_stop();
+    assert(web_persist_name_active() == 0);
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_name_feed_enter_and_esc(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_name_start();
+    assert(web_persist_name_feed(13) == 0); /* enter vazio: rejeitado */
+    assert(web_persist_name_length() == 0);
+    assert(web_persist_name_take_action() == 0);
+    assert(web_persist_name_feed('X') == 1);
+    assert(web_persist_name_feed(13) == 2); /* enter confirma */
+    assert(web_persist_name_take_action() == 1);
+    web_persist_name_clear();
+    assert(web_persist_name_length() == 0);
+
+    web_persist_name_start();
+    assert(web_persist_name_feed('Y') == 1);
+    assert(web_persist_name_feed(27) == -1); /* esc cancela */
+    assert(web_persist_name_take_action() == -1);
+    assert(web_persist_name_length() == 0);
+    web_persist_name_stop();
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_name_feed_charset_and_limit(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_name_start();
+    /* fora do charset ignorados */
+    assert(web_persist_name_feed(' ') == 0);
+    assert(web_persist_name_feed('!') == 0);
+    assert(web_persist_name_feed(127) == 0);
+    assert(web_persist_name_length() == 0);
+    /* limite 7 */
+    const char *s = "ABCDEFG";
+    for (int i = 0; s[i]; i++) assert(web_persist_name_feed(s[i]) == 1);
+    assert(web_persist_name_length() == 7);
+    assert(web_persist_name_feed('Z') == 0); /* buffer cheio ignorado */
+    assert(web_persist_name_length() == 7);
+    web_persist_name_stop();
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_begin_score_and_accessors(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_name_start();
+    assert(web_persist_name_feed('P') == 1);
+    assert(web_persist_name_feed('I') == 1);
+    assert(web_persist_name_feed('L') == 1);
+    assert(web_persist_name_feed('O') == 1);
+    assert(web_persist_name_feed('T') == 1);
+
+    int32_t ticket = web_persist_begin_score(42);
+    assert(ticket > 0); /* nome nao vazio: inicia submissao */
+    assert(web_persist_complete(ticket, 1, 3, 0, 0, 0) == 1);
+    web_persist_bridge_take_result(NULL, NULL, NULL, NULL); /* volta a IDLE */
+    web_persist_name_clear();
+
+    /* nome vazio nao inicia submissao */
+    assert(web_persist_begin_score(42) == 0);
+    web_persist_name_start();
+    assert(web_persist_name_feed('Q') == 1);
+
+    ticket = web_persist_begin_score(1234);
+    assert(ticket > 0);
+    assert(web_persist_kind() == 3);
+    assert(web_persist_ticket() == ticket);
+    assert(web_persist_submit_name_char(ticket, 0) == 'Q');
+    assert(web_persist_submit_name_char(ticket, 1) == 0);
+    assert(web_persist_submit_score(ticket) == 1234);
+
+    int consumed = web_persist_complete(ticket, 1, 5, 0, 0, 0);
+    assert(consumed == 1);
+    assert(web_persist_result_ready() == 1);
+    assert(web_persist_submit_position(ticket) == 5);
+
+    int kind, outcome;
+    assert(web_persist_bridge_take_result(&kind, &outcome, NULL, NULL) == 1);
+    assert(kind == 3);
+    assert(outcome == 1);
+    web_persist_name_stop();
     web_persist_bridge_cleanup();
     TEST_END();
 }

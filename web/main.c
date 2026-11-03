@@ -11,7 +11,7 @@
 #include <string.h>
 _Static_assert(LARGURA_TELA == WEB_WIDTH, "Framebuffer width mismatch");
 _Static_assert(ALTURA_TELA == WEB_HEIGHT, "Framebuffer height mismatch");
-enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE, SAVE_PENDING, RANKING_PENDING, RANKING_NOTICE };
+enum Phase { MENU, CLOSED, INTRO, PLAYING, STAGE_CLEAR, TRANSITION, GAME_OVER, VICTORY, INVALID_LEVEL, LOAD_PENDING, LOAD_NOTICE, SAVE_PENDING, RANKING_PENDING, RANKING_NOTICE, NAME_ENTRY, SUBMIT_PENDING, SUBMIT_NOTICE };
 static enum Phase phase;
 static const char *load_notice;
 static const char *save_notice;
@@ -29,6 +29,12 @@ static int ranking_count;
 static int ranking_position[WEB_SCORE_MAX];
 static long ranking_score[WEB_SCORE_MAX];
 static char ranking_name[WEB_SCORE_MAX][WEB_SCORE_NAME];
+
+/* Estado da escrita do ranking (incremento C). */
+static int submit_ticket;
+static int submit_ok;
+static int submit_position;
+static const char *submit_message;
 EM_JS(void, present, (), {
     if (Module["spaceRender"]) Module["spaceRender"]();
 });
@@ -162,6 +168,28 @@ static void handle_ranking_result(void)
     web_reset();
 }
 
+static void handle_submit_result(void)
+{
+    int kind, outcome, position = 0;
+    if (!web_persist_result_ready()) return;
+    if (submit_ticket > 0)
+        position = web_persist_submit_position(submit_ticket);
+    if (web_persist_bridge_take_result(&kind, &outcome, NULL, NULL) != 1) {
+        submit_ok = 0;
+        submit_position = 0;
+        submit_message = web_submit_message(0, 0);
+        phase = SUBMIT_NOTICE;
+        web_reset();
+        return;
+    }
+    if (kind != 3) { show_menu(); return; }
+    submit_ok = (outcome == 1);
+    submit_position = position;
+    submit_message = web_submit_message(submit_ok, position);
+    phase = SUBMIT_NOTICE;
+    web_reset();
+}
+
 static void new_game(void)
 {
     memset(&player, 0, sizeof player);
@@ -261,12 +289,32 @@ static void tick(void)
         }
     }
 }
+static void render_name_entry(void);
+
 static void render(void)
 {
     if (phase == INTRO || phase == TRANSITION) return; /* Timed sequences own the framebuffer. */
     if (phase == MENU) { web_menu_render(); return; }
     if (phase == RANKING_PENDING || phase == RANKING_NOTICE) {
         web_ranking_render();
+        return;
+    }
+    if (phase == NAME_ENTRY) {
+        render_name_entry();
+        return;
+    }
+    if (phase == SUBMIT_PENDING) {
+        web_clear();
+        mvprintw(ALTURA_TELA / 2 - 2, LARGURA_TELA / 2 - 9, "Subindo pontuacao...");
+        mvprintw(ALTURA_TELA / 2, LARGURA_TELA / 2 - 10, "ESC: cancela");
+        return;
+    }
+    if (phase == SUBMIT_NOTICE) {
+        web_clear();
+        const int cx = LARGURA_TELA / 2, cy = ALTURA_TELA / 2;
+        mvprintw(cy - 2, cx - 10, "%s", submit_message ? submit_message : "");
+        if (submit_ok) mvprintw(cy, cx - 10, "Position: %d", submit_position);
+        mvprintw(cy + 3, cx - 10, "ENTER / ESC: menu");
         return;
     }
     if (phase == LOAD_PENDING) {
@@ -320,6 +368,23 @@ static void render(void)
         mvprintw(9, 4, "ENTER: MAIN MENU");
     }
 }
+
+static void render_name_entry(void)
+{
+    web_clear();
+    const int cx = LARGURA_TELA / 2, cy = ALTURA_TELA / 2;
+    int len = web_persist_name_length();
+    int i;
+    mvprintw(cy - 4, cx - 12, "ENTER YOUR NAME");
+    mvprintw(cy - 2, cx - 10, "PONTUACAO: %ld", player.pontuacao);
+    mvprintw(cy, cx - 10, "NOME (MAX 7 CAR.): ");
+    for (i = 0; i < len; i++) {
+        int c = web_persist_name_char(i);
+        mvaddch(cy, cx + 10 + i, c >= 0 ? (char)c : '?');
+    }
+    mvprintw(cy + 3, cx - 12, "ENTER: confirma   ESC: cancela");
+}
+
 static void frame(void)
 {
     double now = emscripten_get_now();
@@ -391,6 +456,39 @@ static void frame(void)
             web_ranking_cancel();
             show_menu();
         }
+    } else if (phase == GAME_OVER || phase == VICTORY) {
+        if (enter && player.pontuacao > 0 && web_persist_bridge_available()) {
+            phase = NAME_ENTRY;
+            web_persist_name_start();
+            web_reset();
+        } else if (enter || web_take_press(6)) {
+            show_menu();
+        }
+    } else if (phase == NAME_ENTRY) {
+        int act = web_persist_name_take_action();
+        if (act == 1) {
+            web_persist_name_stop();
+            phase = SUBMIT_PENDING;
+            submit_ticket = web_persist_begin_score(player.pontuacao);
+            if (submit_ticket <= 0) {
+                show_menu();
+            } else {
+                web_reset();
+            }
+        } else if (act == -1) {
+            web_persist_name_stop();
+            show_menu();
+        }
+    } else if (phase == SUBMIT_PENDING) {
+        if (web_take_press(6)) {
+            web_persist_cancel();
+            web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
+            show_menu();
+        } else {
+            handle_submit_result();
+        }
+    } else if (phase == SUBMIT_NOTICE) {
+        if (enter || web_take_press(6)) show_menu();
     } else if (enter && phase != PLAYING && phase != STAGE_CLEAR &&
                phase != SAVE_PENDING && phase != RANKING_NOTICE) {
         show_menu();

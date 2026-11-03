@@ -202,6 +202,40 @@
         });
     }
 
+    function startScoreSubmit(ticket) {
+        if (!client) return;
+        // Lê o nome (caractere a caractere, ate 7) e a pontuação do C
+        let name = "";
+        for (let ci = 0; ci < 7; ci++) {
+            const code = safeCall(() => moduleInstance._web_persist_submit_name_char(ticket, ci), -1);
+            if (code === -1 || code === 0) break;
+            name += String.fromCharCode(code);
+        }
+        const score = safeCall(() => moduleInstance._web_persist_submit_score(ticket), -1);
+        if (name === "" || score === -1) {
+            complete(ticket, -2, 0, 0, 0, 0);
+            resetOperation();
+            return;
+        }
+        operationPromise = Promise.resolve().then(() => {
+            if (activeTicket !== ticket || activeKind !== 3) return;
+            return safeCall(() => client.submitScore(name, score));
+        })
+        .then(result => {
+            if (activeTicket !== ticket || activeKind !== 3) return;
+            complete(ticket, 1, result.position, 0, 0, 0);
+        })
+        .catch(err => {
+            if (activeTicket !== ticket || activeKind !== 3) return;
+            const outcome = mapErrorToOutcome(err);
+            if (outcome === -3 && (activeKind !== 3 || activeTicket !== ticket)) return;
+            complete(ticket, outcome, 0, 0, 0, 0);
+        })
+        .finally(() => {
+            if (activeTicket === ticket && activeKind === 3) resetOperation();
+        });
+    }
+
     const SpacePersistenceBridge = Object.freeze({
         init(Module, options) {
             if (initialized) return false; // rejeita segundo init
@@ -262,6 +296,8 @@
                     startLoad(ticket);
                 } else if (kind === 2) {
                     startSave(ticket);
+                } else if (kind === 3) {
+                    startScoreSubmit(ticket);
                 } else if (kind === 4) {
                     startScoreList(ticket);
                 }

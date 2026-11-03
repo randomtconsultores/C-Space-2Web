@@ -78,6 +78,13 @@ void web_ranking_apply_bridge_result(int ticket, int kind, int outcome)
     web_ranking_set(count, pos, sc, names);
 }
 
+const char *web_submit_message(int ok, int position)
+{
+    if (!ok) return "Could not save score.";
+    if (position <= 9) return "NEW HIGH SCORE";
+    return "SCORE SAVED";
+}
+
 void web_menu_open(void)
 {
     page = MAIN_PAGE;

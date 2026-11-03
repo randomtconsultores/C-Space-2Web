@@ -19,6 +19,13 @@ function createMockModule() {
         _web_persist_kind: () => kind,
         _web_persist_ticket: () => ticket,
         _web_persist_field: (t, f) => (t === ticket && fields[f] !== undefined ? fields[f] : -1),
+        _web_persist_submit_name_char: (t, ci) => {
+            const name = "PILOT";
+            return t === ticket && ci >= 0 && ci < name.length
+                ? name.charCodeAt(ci)
+                : -1;
+        },
+        _web_persist_submit_score: (t) => t === ticket ? 1234 : -1,
         _web_persist_complete: (t, o, fv, li, lv, sc) => {
             completeCalls.push({ ticket: t, outcome: o, fv, li, lv, sc });
         },
@@ -38,7 +45,9 @@ function createMockClient(behavior = {}) {
     const loads = [];
     const saves = [];
     const scores = [];
+    const submits = [];
     let scoresResolver;
+    let submitResolver;
 
     const client = {
         load: () => {
@@ -62,6 +71,13 @@ function createMockClient(behavior = {}) {
             });
             return p;
         },
+        submitScore: (name, score) => {
+            const p = new Promise((resolve, reject) => {
+                submitResolver = { resolve, reject, name, score };
+                submits.push({ resolve, reject, name, score });
+            });
+            return p;
+        },
         cancel: () => {
             if (loadResolver) loadResolver.reject(new Error("cancelled"));
             if (saveResolver) saveResolver.reject(new Error("cancelled"));
@@ -73,10 +89,13 @@ function createMockClient(behavior = {}) {
         _rejectSave: (err) => { if (saveResolver) saveResolver.reject(err); },
         _resolveScores: (v) => { if (scoresResolver) scoresResolver.resolve(v); },
         _rejectScores: (e) => { if (scoresResolver) scoresResolver.reject(e); },
+        _resolveSubmit: (v) => { if (submitResolver) submitResolver.resolve(v); },
+        _rejectSubmit: (e) => { if (submitResolver) submitResolver.reject(e); },
         _setRevision: (r) => { revision = r; },
         _loads: () => loads,
         _saves: () => saves,
         _scores: () => scores,
+        _submits: () => submits,
         // Expor resultados para os testes
         loadResult,
         saveResult
@@ -660,6 +679,50 @@ test("SCORE LIST error maps to -1", async () => {
     await tick();
 
     client._rejectScores({ code: "network_error" });
+    await tick();
+
+    const calls = Module._completeCalls();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].outcome, -1);
+});
+
+test("SCORE SUBMIT ok: reads name+score, completes with position", async () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient({ initialRevision: 1 });
+    Bridge.init(Module, { client });
+
+    Module._setKind(3);
+    Module._setTicket(5);
+    Bridge.poll();
+    await tick();
+
+    const res = { name: "PILOT", score: 1234, position: 2 };
+    client._resolveSubmit(res);
+    await tick();
+
+    const calls = Module._completeCalls();
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].ticket, 5);
+    assert.equal(calls[0].outcome, 1);
+    assert.equal(calls[0].fv, 2); // position passed as fv
+    assert.equal(client._submits().length, 1);
+    assert.equal(client._submits()[0].name, "PILOT");
+    assert.equal(client._submits()[0].score, 1234);
+});
+
+test("SCORE SUBMIT error maps to -1", async () => {
+    const Bridge = freshBridge();
+    const Module = createMockModule();
+    const client = createMockClient({ initialRevision: 1 });
+    Bridge.init(Module, { client });
+
+    Module._setKind(3);
+    Module._setTicket(9);
+    Bridge.poll();
+    await tick();
+
+    client._rejectSubmit({ code: "session_rate_limited" });
     await tick();
 
     const calls = Module._completeCalls();

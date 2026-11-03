@@ -202,6 +202,16 @@
                     return Object.freeze({name: entry.name, score: entry.score, position: entry.position});
                 }));
             }),
+            submitScore: async (name, score) => {
+                return run(async ctx => {
+                    await session(ctx);
+                    const value = await request(ctx, "/api/v1/scores", "POST",
+                        {name, score}, true, [200]);
+                    if (!record(value, ["name", "score", "position"]))
+                        throw fault("invalid_response", ctx);
+                    return Object.freeze({name: value.name, score: value.score, position: value.position});
+                });
+            },
             getState: () => Object.freeze({busy: active !== null, revision, epoch})
         });
     }

@@ -11,6 +11,7 @@ typedef enum {
     PB_LOAD_PENDING,
     PB_SAVE_PENDING,
     PB_SCORE_PENDING,
+    PB_SCORE_SUBMIT,
     PB_RESULT_READY
 } PersistBridgeState;
 
@@ -29,6 +30,17 @@ static int s_score_count = 0;
 static int s_score_position[WEB_SCORE_MAX];
 static long s_score_value[WEB_SCORE_MAX];
 static char s_score_name[WEB_SCORE_MAX][WEB_SCORE_NAME];
+
+/* Submissao de pontuacao (kind 3). */
+static char s_submit_name[WEB_SCORE_NAME];
+static long s_submit_score = 0;
+static int s_submit_position = 0;
+
+/* Buffer de entrada do nome (NAME_ENTRY). */
+static char s_name[WEB_SCORE_NAME];
+static int s_name_len = 0;
+static int s_name_action = 0; /* 1=confirmar, -1=cancelar, 0=nenhuma */
+static int s_name_active = 0; /* modo NAME_ENTRY ativo (sinaliza ao JS) */
 
 static int32_t next_ticket(void)
 {
@@ -50,6 +62,13 @@ void web_persist_bridge_init(void)
     memset(s_score_value, 0, sizeof(s_score_value));
     memset(s_score_name, 0, sizeof(s_score_name));
     s_score_count = 0;
+    memset(s_submit_name, 0, sizeof(s_submit_name));
+    s_submit_score = 0;
+    s_submit_position = 0;
+    memset(s_name, 0, sizeof(s_name));
+    s_name_len = 0;
+    s_name_action = 0;
+    s_name_active = 0;
 }
 
 void web_persist_bridge_cleanup(void)
@@ -67,6 +86,13 @@ void web_persist_bridge_cleanup(void)
     memset(s_score_value, 0, sizeof(s_score_value));
     memset(s_score_name, 0, sizeof(s_score_name));
     s_score_count = 0;
+    memset(s_submit_name, 0, sizeof(s_submit_name));
+    s_submit_score = 0;
+    s_submit_position = 0;
+    memset(s_name, 0, sizeof(s_name));
+    s_name_len = 0;
+    s_name_action = 0;
+    s_name_active = 0;
 }
 
 void web_persist_bridge_set_available(int available)
@@ -83,6 +109,7 @@ int32_t web_persist_kind(void)
 {
     if (s_state == PB_LOAD_PENDING) return 1;
     if (s_state == PB_SAVE_PENDING) return 2;
+    if (s_state == PB_SCORE_SUBMIT) return 3;
     if (s_state == PB_SCORE_PENDING) return 4;
     return 0;
 }
@@ -90,7 +117,7 @@ int32_t web_persist_kind(void)
 int32_t web_persist_ticket(void)
 {
     if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING ||
-        s_state == PB_SCORE_PENDING) return s_ticket;
+        s_state == PB_SCORE_SUBMIT || s_state == PB_SCORE_PENDING) return s_ticket;
     return 0;
 }
 
@@ -204,7 +231,7 @@ int32_t web_persist_complete(int32_t ticket, int32_t outcome,
 {
     if (ticket != s_ticket || ticket <= 0) return 0;
     if (s_state != PB_LOAD_PENDING && s_state != PB_SAVE_PENDING &&
-        s_state != PB_SCORE_PENDING) return 0;
+        s_state != PB_SCORE_SUBMIT && s_state != PB_SCORE_PENDING) return 0;
 
     if (s_kind == 1) { /* LOAD */
         if (!validate_load_outcome(outcome)) outcome = -1;
@@ -258,6 +285,12 @@ int32_t web_persist_complete(int32_t ticket, int32_t outcome,
         s_outcome = outcome;
         s_state = PB_RESULT_READY;
         return 1;
+    } else if (s_kind == 3) { /* SCORE_SUBMIT */
+        if (outcome != 1 && outcome != 0 && outcome > -1) outcome = -1;
+        s_outcome = outcome;
+        if (outcome == 1) s_submit_position = (int)format_version;
+        s_state = PB_RESULT_READY;
+        return 1;
     }
     return 0;
 }
@@ -265,7 +298,7 @@ int32_t web_persist_complete(int32_t ticket, int32_t outcome,
 void web_persist_cancel(void)
 {
     if (s_state == PB_LOAD_PENDING || s_state == PB_SAVE_PENDING ||
-        s_state == PB_SCORE_PENDING) {
+        s_state == PB_SCORE_SUBMIT || s_state == PB_SCORE_PENDING) {
         s_outcome = -3;
         s_state = PB_RESULT_READY;
     }
@@ -309,6 +342,128 @@ int32_t web_persist_begin_score_list(void)
     s_outcome = 0;
     s_score_count = 0;
     return ticket;
+}
+
+int32_t web_persist_begin_score(long score)
+{
+    if (s_state != PB_IDLE) return 0;
+    if (s_name_len == 0) return 0; /* nome vazio nao e submetido */
+    if (score < 0 || score > 2147473647) return 0;
+    int32_t ticket = next_ticket();
+    if (ticket <= 0) return 0;
+    memcpy(s_submit_name, s_name, WEB_SCORE_NAME);
+    s_submit_score = score;
+    s_submit_position = 0;
+    s_state = PB_SCORE_SUBMIT;
+    s_ticket = ticket;
+    s_kind = 3;
+    s_outcome = 0;
+    return ticket;
+}
+
+int web_persist_name_feed(int ch)
+{
+    if (ch == 27) { /* ESC: cancela e limpa o nome */
+        s_name_len = 0;
+        s_name[0] = '\0';
+        s_name_action = -1;
+        return -1;
+    }
+    if (ch == 13) { /* Enter: confirma apenas se nome nao vazio */
+        if (s_name_len > 0) { s_name_action = 1; return 2; }
+        return 0;
+    }
+    if (ch == 8) { /* Backspace: apaga ultimo */
+        if (s_name_len > 0) {
+            s_name[--s_name_len] = '\0';
+            s_name_action = 0;
+            return 1;
+        }
+        return 0;
+    }
+    /* Imprimivel: maiusculas A-Z e digitos 0-9, limite 7. */
+    {
+        int c = ch;
+        if (c >= 'a' && c <= 'z') c = c - 'a' + 'A';
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            if (s_name_len < WEB_SCORE_NAME - 1) {
+                s_name[s_name_len++] = (char)c;
+                s_name[s_name_len] = '\0';
+                s_name_action = 0;
+                return 1;
+            }
+            return 0; /* buffer cheio: ignora */
+        }
+        return 0; /* caractere fora do charset: ignora */
+    }
+}
+
+int web_persist_name_length(void)
+{
+    return s_name_len;
+}
+
+int web_persist_name_char(int index)
+{
+    if (index < 0 || index >= s_name_len) return -1;
+    return (int)(unsigned char)s_name[index];
+}
+
+void web_persist_name_clear(void)
+{
+    s_name_len = 0;
+    s_name[0] = '\0';
+    s_name_action = 0;
+}
+
+int web_persist_name_take_action(void)
+{
+    int action = s_name_action;
+    s_name_action = 0;
+    return action;
+}
+
+void web_persist_name_start(void)
+{
+    s_name_active = 1;
+    web_persist_name_clear();
+}
+
+void web_persist_name_stop(void)
+{
+    s_name_active = 0;
+    web_persist_name_clear();
+}
+
+int web_persist_name_active(void)
+{
+    return s_name_active ? 1 : 0;
+}
+
+int32_t web_persist_submit_name_char(int32_t ticket, int32_t char_index)
+{
+    if (ticket <= 0 || ticket != s_ticket || s_kind != 3 ||
+        (s_state != PB_SCORE_SUBMIT && s_state != PB_RESULT_READY)) return -1;
+    if (char_index < 0 || char_index >= WEB_SCORE_NAME) return -1;
+    return (int)(unsigned char)s_submit_name[char_index];
+}
+
+int32_t web_persist_submit_score(int32_t ticket)
+{
+    if (ticket <= 0 || ticket != s_ticket || s_kind != 3 ||
+        (s_state != PB_SCORE_SUBMIT && s_state != PB_RESULT_READY)) return -1;
+    {
+        long v = s_submit_score;
+        if (v < 0 || v > 2147473647L) return -1;
+        return (int32_t)v;
+    }
+}
+
+int32_t web_persist_submit_position(int32_t ticket)
+{
+    if (ticket <= 0 || ticket != s_ticket || s_kind != 3 ||
+        s_state != PB_RESULT_READY) return -1;
+    return s_submit_position;
 }
 
 int web_persist_bridge_take_result(int *out_kind, int *out_outcome,

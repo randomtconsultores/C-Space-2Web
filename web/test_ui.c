@@ -15,6 +15,7 @@ static void select_down(int n)
 static void test_ranking_apply_ok(void);
 static void test_ranking_apply_empty(void);
 static void test_ranking_apply_error(void);
+static void test_submit_message(void);
 int main(void)
 {
     web_menu_open();
@@ -87,6 +88,7 @@ int main(void)
     test_ranking_apply_ok();
     test_ranking_apply_empty();
     test_ranking_apply_error();
+    test_submit_message();
 
     puts("PASS: menu bounds, actions, SOUND toggle/queue clear and UI-only key edges");
     return 0;
@@ -138,4 +140,14 @@ static void test_ranking_apply_error(void)
     assert(strstr((const char *)web_buffer(), "Erro ao carregar ranking."));
     web_persist_bridge_take_result(NULL, NULL, NULL, NULL);
     web_persist_bridge_cleanup();
+}
+
+static void test_submit_message(void)
+{
+    assert(strcmp(web_submit_message(1, 1), "NEW HIGH SCORE") == 0);
+    assert(strcmp(web_submit_message(1, 9), "NEW HIGH SCORE") == 0);
+    assert(strcmp(web_submit_message(1, 10), "SCORE SAVED") == 0);
+    assert(strcmp(web_submit_message(1, 100), "SCORE SAVED") == 0);
+    assert(strcmp(web_submit_message(0, 0), "Could not save score.") == 0);
+    assert(strcmp(web_submit_message(0, 5), "Could not save score.") == 0);
 }

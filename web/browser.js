@@ -339,6 +339,19 @@ var Module = {
         }
         window.addEventListener("keydown", function (event) {
             if (event.ctrlKey || event.metaKey || event.altKey) return;
+            if (typeof Module._web_persist_name_active === "function" &&
+                Module._web_persist_name_active()) {
+                event.preventDefault();
+                if (!event.repeat) {
+                    var ch = -1;
+                    if (event.code === "Enter" || event.code === "NumpadEnter") ch = 13;
+                    else if (event.code === "Backspace") ch = 8;
+                    else if (event.code === "Escape") ch = 27;
+                    else ch = character(event);
+                    if (ch >= 0) Module._web_persist_name_feed(ch);
+                }
+                return;
+            }
             if (Module._web_capture_active()) {
                 event.preventDefault();
                 if (!event.repeat) Module._web_capture_key(event.key === "Escape" || event.code === "Escape" ? 27 : character(event));

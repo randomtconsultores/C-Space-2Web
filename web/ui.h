@@ -15,4 +15,6 @@ void web_ranking_cancel(void);
 /* Aplica o resultado da ponte (kind/outcome) lendo os acessores (estado
    PB_RESULT_READY, antes de take_result) e chama web_ranking_set/web_ranking_error. */
 void web_ranking_apply_bridge_result(int ticket, int kind, int outcome);
+/* Escolhe o texto da mensagem de SUBMIT_NOTICE (OK/erro e posicao). Testavel. */
+const char *web_submit_message(int ok, int position);
 #endif

@@ -87,10 +87,45 @@ int32_t web_persist_score_feed_entry(int32_t ticket, int32_t index,
 int32_t web_persist_score_feed_name_char(int32_t ticket, int32_t index,
                                          int32_t char_index, int32_t char_code);
 
+/* ===== Submissao de pontuacao (kind 3) ===== */
+
+/* Inicia submissao de pontuacao com o nome no buffer de entrada (NAME_ENTRY).
+   Retorna ticket (>0) ou 0 se falha/já ocupado/nome vazio. */
+int32_t web_persist_begin_score(long score);
+
+/* Acessores da submissao (kind 3). Retornam -1 se invalido. */
+int32_t web_persist_submit_name_char(int32_t ticket, int32_t char_index);
+int32_t web_persist_submit_score(int32_t ticket);
+int32_t web_persist_submit_position(int32_t ticket);
+
+/* ===== Buffer de introducao do nome (sincrono, fase NAME_ENTRY) ===== */
+
+/* Alimenta um caractere: 1=aceito (acrescido/retrocedido),
+   2=Enter confirmado (nome nao vazio), -1=ESC cancelado, 0=ignorado. */
+int web_persist_name_feed(int ch);
+
+/* Devolve o comprimento atual do nome (0..WEB_SCORE_NAME-1). */
+int web_persist_name_length(void);
+
+/* Devolve o codigo do caractere na posicao, ou -1. */
+int web_persist_name_char(int index);
+
+/* Limpa o buffer do nome. */
+void web_persist_name_clear(void);
+
+/* Devolve e limpa a acao pendente: 1=confirmar, -1=cancelar, 0=nenhuma. */
+int web_persist_name_take_action(void);
+
+/* Ativa/desativa o modo de entrada de nome (sinaliza ao JS que deve encaminhar
+   teclas para web_persist_name_feed em vez das acoes de jogo). */
+void web_persist_name_start(void);
+void web_persist_name_stop(void);
+int web_persist_name_active(void);
+
 /* ===== API para main.c obter resultado uma única vez ===== */
-/* kind: 1=LOAD, 2=SAVE, 4=SCORE_LIST. Preenche *out_player e *out_level apenas
-   se outcome==1 e kind==1. Retorna 1 se havia resultado pronto e foi consumido,
-   0 caso contrario. */
+/* kind: 1=LOAD, 2=SAVE, 3=SCORE_SUBMIT, 4=SCORE_LIST. Preenche *out_player e
+   *out_level apenas se outcome==1 e kind==1. Retorna 1 se havia resultado
+   pronto e foi consumido, 0 caso contrario. */
 int web_persist_bridge_take_result(int *out_kind, int *out_outcome,
                                    Player *out_player, int *out_level);
 
