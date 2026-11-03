@@ -1,0 +1,17 @@
+# Caddyfile — servico HTTPS local para teste de LOAD/SAVE no browser.
+#
+# Uso (no Ubuntu do utilizador):
+#   caddy run --config Caddyfile
+#
+# Ouvinte: cspace.test:8443 (TLS com certificado mkcert).
+# Reverse proxy: 127.0.0.1:8002 (Flask, somente loopback).
+#
+# O reverse_proxy do Caddy encaminha as cabecalhos do cliente inalterados,
+# incluindo Origin. Nao reescreve nem remove a cabeca Origin.
+{
+    auto_https off
+}
+cspace.test:8443 {
+    tls cert.pem key.pem
+    reverse_proxy 127.0.0.1:8002
+}
