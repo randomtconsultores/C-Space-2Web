@@ -93,6 +93,12 @@ int32_t web_persist_score_feed_name_char(int32_t ticket, int32_t index,
    Retorna ticket (>0) ou 0 se falha/já ocupado/nome vazio. */
 int32_t web_persist_begin_score(long score);
 
+/* Submete a pontuacao com o nome atualmente no buffer de entrada (NAME_ENTRY):
+   copia o nome para s_submit_name, inicia a submissao e depois limpa o buffer
+   de entrada (independentemente do resultado). Devolve o ticket (>0) ou 0 se
+   falhar (estado ocupado, nome vazio ou pontuacao invalida). */
+int32_t web_persist_name_submit(long score);
+
 /* Acessores da submissao (kind 3). Retornam -1 se invalido. */
 int32_t web_persist_submit_name_char(int32_t ticket, int32_t char_index);
 int32_t web_persist_submit_score(int32_t ticket);

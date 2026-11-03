@@ -361,6 +361,13 @@ int32_t web_persist_begin_score(long score)
     return ticket;
 }
 
+int32_t web_persist_name_submit(long score)
+{
+    int32_t ticket = web_persist_begin_score(score);
+    web_persist_name_stop();
+    return ticket;
+}
+
 int web_persist_name_feed(int ch)
 {
     if (ch == 27) { /* ESC: cancela e limpa o nome */

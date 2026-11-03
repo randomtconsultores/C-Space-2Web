@@ -467,9 +467,8 @@ static void frame(void)
     } else if (phase == NAME_ENTRY) {
         int act = web_persist_name_take_action();
         if (act == 1) {
-            web_persist_name_stop();
             phase = SUBMIT_PENDING;
-            submit_ticket = web_persist_begin_score(player.pontuacao);
+            submit_ticket = web_persist_name_submit(player.pontuacao);
             if (submit_ticket <= 0) {
                 show_menu();
             } else {

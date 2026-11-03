@@ -28,6 +28,7 @@ static void test_name_feed_chars_and_backspace(void);
 static void test_name_feed_enter_and_esc(void);
 static void test_name_feed_charset_and_limit(void);
 static void test_begin_score_and_accessors(void);
+static void test_name_submit(void);
 
 static void test_init_cleanup(void)
 {
@@ -578,6 +579,7 @@ int main(void)
     test_name_feed_enter_and_esc();
     test_name_feed_charset_and_limit();
     test_begin_score_and_accessors();
+    test_name_submit();
     printf("\nAll %d tests passed.\n", g_test_count);
     return 0;
 }
@@ -757,6 +759,35 @@ static void test_begin_score_and_accessors(void)
     assert(kind == 3);
     assert(outcome == 1);
     web_persist_name_stop();
+    web_persist_bridge_cleanup();
+    TEST_END();
+}
+
+static void test_name_submit(void)
+{
+    TEST_START();
+    web_persist_bridge_init();
+    web_persist_name_start();
+    assert(web_persist_name_feed('A') == 1);
+    assert(web_persist_name_feed('B') == 1);
+    assert(web_persist_name_feed(13) == 2); /* enter confirma */
+    assert(web_persist_name_take_action() == 1);
+    int32_t ticket = web_persist_name_submit(1234);
+    assert(ticket > 0);
+    assert(web_persist_name_active() == 0); /* stop limpa o buffer */
+    assert(web_persist_name_length() == 0);
+    assert(web_persist_submit_name_char(ticket, 0) == 'A');
+    assert(web_persist_submit_name_char(ticket, 1) == 'B');
+    assert(web_persist_submit_name_char(ticket, 2) == 0);
+    assert(web_persist_submit_score(ticket) == 1234);
+    web_persist_bridge_take_result(NULL, NULL, NULL, NULL); /* volta a IDLE */
+    web_persist_bridge_cleanup();
+
+    /* nome vazio -> submit devolve 0 e name_active == 0 */
+    web_persist_bridge_init();
+    web_persist_name_start();
+    assert(web_persist_name_submit(42) == 0);
+    assert(web_persist_name_active() == 0);
     web_persist_bridge_cleanup();
     TEST_END();
 }
